@@ -2009,7 +2009,6 @@ static void msm_fb_commit_wq_handler(struct work_struct *work)
 static int msm_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-	int hole_offset;
 
 	msm_fb_pan_idle(mfd);
 	if (var->rotate != FB_ROTATE_UR)
@@ -2109,20 +2108,7 @@ static int msm_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	if (var->xoffset > (var->xres_virtual - var->xres))
 		return -EINVAL;
 
-	if (!mfd->panel_info.mode2_yres)
-		hole_offset = (mfd->fbi->fix.line_length *
-			mfd->panel_info.yres) % PAGE_SIZE;
-	else
-		hole_offset = (mfd->fbi->fix.line_length *
-			mfd->panel_info.mode2_yres) % PAGE_SIZE;
-
-	if (!hole_offset) {
-		hole_offset = PAGE_SIZE - hole_offset;
-		hole_offset = hole_offset/mfd->fbi->fix.line_length;
-	}
-
-	if (var->yoffset > (var->yres_virtual - var->yres + (hole_offset *
-							(mfd->fb_page - 1))))
+	if (var->yoffset > (var->yres_virtual - var->yres))
 		return -EINVAL;
 
 	return 0;
