@@ -573,6 +573,7 @@ int mdp4_dtv_on(struct platform_device *pdev)
 	/* Mdp clock enable */
 	mdp_clk_ctrl(1);
 
+	mdp_footswitch_ctrl(TRUE);
 	mdp4_overlay_panel_mode(MDP4_MIXER1, MDP4_PANEL_DTV);
 
 	/* Allocate dtv_pipe at dtv_on*/
