@@ -2623,6 +2623,39 @@ static struct i2c_board_info __initdata mpu3050_GSBI10_boardinfo[] = {
 	},
 };
 
+#ifdef CONFIG_MACH_PYRAMID
+static struct mpu3050_platform_data mpu3050_data_XB = {
+	.int_config = 0x10,
+	.orientation = { -1, 0, 0, 0, 1, 0, 0, 0, -1 },
+	.level_shifter = 0,
+
+	.accel = {
+		.get_slave_descr = get_accel_slave_descr,
+		.adapt_num = 5, /* The i2c bus to which the mpu device is connected */
+		.bus = EXT_SLAVE_BUS_SECONDARY,
+		.address = 0x70 >> 1,
+		.orientation = { -1, 0, 0, 0, -1, 0, 0, 0, 1 },
+
+	},
+
+	.compass = {
+		.get_slave_descr = get_compass_slave_descr,
+		.adapt_num = 5, /* The i2c bus to which the mpu device is connected */
+		.bus = EXT_SLAVE_BUS_PRIMARY,
+		.address = 0x1A >> 1,
+		.orientation = { -1, 0, 0, 0, 1, 0, 0, 0, -1 },
+	},
+};
+
+static struct i2c_board_info __initdata mpu3050_GSBI10_boardinfo_XB[] = {
+	{
+		I2C_BOARD_INFO("mpu3050", 0xD0 >> 1),
+		.irq = MSM_GPIO_TO_INT(HTC8X60_GYRO_INT),
+		.platform_data = &mpu3050_data_XB,
+	},
+};
+#endif
+
 static int isl29028_power(int pwr_device, uint8_t enable)
 {
 	return 0;
