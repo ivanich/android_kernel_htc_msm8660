@@ -2774,6 +2774,27 @@ static void register_i2c_devices(void)
 					msm8x60_i2c_devices[i].len);
 	}
 
+#if defined(CONFIG_MACH_PYRAMID)
+	if (system_rev >= 1) {
+		if (ps_type == 1) {
+			i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
+				i2c_isl29028_devices,
+				ARRAY_SIZE(i2c_isl29028_devices));
+		} else if (ps_type == 2) {
+			i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
+				i2c_isl29029_devices,
+				ARRAY_SIZE(i2c_isl29029_devices));
+		} else
+			printk(KERN_DEBUG "No Intersil chips\n");
+
+		i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
+				mpu3050_GSBI10_boardinfo_XB, ARRAY_SIZE(mpu3050_GSBI10_boardinfo_XB));
+	} else {
+		i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
+				mpu3050_GSBI10_boardinfo, ARRAY_SIZE(mpu3050_GSBI10_boardinfo));
+	}
+#endif
+#if defined(CONFIG_MACH_SHOOTER) || defined(CONFIG_MACH_SHOOTER_U)
 	i2c_register_board_info(MSM_GSBI10_QUP_I2C_BUS_ID,
 		mpu3050_GSBI10_boardinfo, ARRAY_SIZE(mpu3050_GSBI10_boardinfo));
 
@@ -2787,6 +2808,7 @@ static void register_i2c_devices(void)
 			ARRAY_SIZE(i2c_isl29029_devices));
 	} else
 		printk(KERN_DEBUG "No Intersil chips\n");
+#endif
 #endif
 }
 
