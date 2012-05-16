@@ -622,11 +622,12 @@ config MACH_PYRAMID
 
 config HTC_DEVICE
 	default y if MACH_SHOOTER || MACH_SHOOTER_U || MACH_PYRAMID
-	bool
+	bool "Set various HTC options"
 
 config HTC_MMC
-	default n if MACH_SHOOTER
-	bool
+	depends on HTC_DEVICE
+	default n
+	bool "HTC MMC variant"
 
 config MACH_MSM8960_SIM
 	depends on ARCH_MSM8960
