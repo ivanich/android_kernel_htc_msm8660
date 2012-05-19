@@ -3907,19 +3907,24 @@ out:
 static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
 {
 	int rc = 0;
-	struct sdcc_reg *curr_vdd_reg, *curr_vccq_reg, *curr_vddp_reg;
+	struct sdcc_reg *curr_vdd_reg, *curr_vddp_reg;
+#ifndef CONFIG_HTC_MMC
+	struct sdcc_reg *curr_vccq_reg;
+#endif
 	struct sdcc_reg_data *curr;
 
 	curr = &sdcc_vreg_data[dev_id - 1];
 	curr_vdd_reg = curr->vdd_data;
-/* derp with htc mmc
+#ifndef CONFIG_HTC_MMC
 	curr_vccq_reg = curr->vccq_data;
-*/
+#endif
 	curr_vddp_reg = curr->vddp_data;
 
 	/* check if regulators are initialized or not? */
 	if ((curr_vdd_reg && !curr_vdd_reg->reg) ||
+#ifndef CONFIG_HTC_MMC
 		(curr_vccq_reg && !curr_vccq_reg->reg) ||
+#endif
 		(curr_vddp_reg && !curr_vddp_reg->reg)) {
 		/* initialize voltage regulators required for this SDCC */
 		rc = msm_sdcc_vreg_init(dev_id, 1);
@@ -3943,6 +3948,7 @@ static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
 			goto out;
 	}
 
+#ifndef CONFIG_HTC_MMC
 	if (curr_vccq_reg) {
 		if (enable)
 			rc = msm_sdcc_vreg_enable(curr_vccq_reg);
@@ -3951,6 +3957,7 @@ static int msm_sdcc_setup_vreg(int dev_id, unsigned char enable)
 		if (rc)
 			goto out;
 	}
+#endif
 
 	if (curr_vddp_reg) {
 		if (enable)
