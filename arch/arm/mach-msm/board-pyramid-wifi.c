@@ -9,7 +9,11 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <linux/skbuff.h>
+#ifdef CONFIG_BCM4329_248
 #include <linux/wifi_tiwlan.h>
+#else
+#include <linux/wlan_plat.h>
+#endif
 
 #include "board-pyramid.h"
 
@@ -29,7 +33,9 @@ int pyramid_wifi_get_mac_addr(unsigned char *buf);
 
 #define WLAN_SKB_BUF_NUM	16
 
-//#define HW_OOB 1
+#ifndef CONFIG_BCM4329_248
+#define HW_OOB 1
+#endif
 
 static struct sk_buff *wlan_static_skb[WLAN_SKB_BUF_NUM];
 
