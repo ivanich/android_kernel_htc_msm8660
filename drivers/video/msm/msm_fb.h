@@ -38,7 +38,6 @@
 #include <linux/fb.h>
 #include <linux/list.h>
 #include <linux/types.h>
-
 #include <linux/msm_mdp.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -185,6 +184,9 @@ struct msm_fb_data_type {
 	u32 writeback_state;
 	bool writeback_active_cnt;
 	int cont_splash_done;
+	void *copy_splash_buf;
+	unsigned char *copy_splash_phys;
+	void *cpu_pm_hdl;
 };
 
 struct dentry *msm_fb_get_debugfs_root(void);
