@@ -719,20 +719,23 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 	if (ts->debug_log_level & 0x1) {
 		for (loop_i = 0; loop_i < 32; loop_i++) {
 			printk(KERN_INFO "0x%2.2X ", buf[loop_i]);
-			if (loop_i % 16 == 15)
+			if (loop_i % 16 == 15) {
 				printk("\n");
+			}
 		}
 	}
 
 	if ((buf[1] & 0x10) == 0x10) {
 		printk(KERN_INFO "Bootloader mode to OP mode\n");
-		if (cy8c_init_panel(ts) < 0)
+		if (cy8c_init_panel(ts) < 0) {
 			printk(KERN_ERR "TOUCH_ERR: %s init failed\n",
 			__func__);
+		}
 	}
 
-	if (buf[2] & 0x10)
+	if (buf[2] & 0x10) {
 		printk(KERN_INFO "[TOUCH] cy8c large object detected\n");
+	}
 	if ((buf[2] & 0x0F) >= 1) {
 		int base = 0x03;
 		int report = -1;
@@ -741,9 +744,10 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 		ts->p_finger_id = ts->finger_id;
 		ts->finger_count = ((buf[2] & 0x0F) > 4) ? 4 : buf[2] & 0x0F;
 		ts->finger_id = buf[8] << 8 | buf[21];
-		if (ts->debug_log_level & 0x4)
+		if (ts->debug_log_level & 0x4) {
 			printk(KERN_INFO "Finger ID: %X, count: %d\n",
 				ts->finger_id, ts->finger_count);
+		}
 		if (ts->p_finger_count && (ts->finger_count != ts->p_finger_count ||
 			ts->finger_id != ts->p_finger_id)) {
 			report = 0;
@@ -752,10 +756,11 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 				? ts->p_finger_count : ts->finger_count;
 				loop_i > 0; loop_i--) {
 				for (loop_j = ts->p_finger_count; loop_j > 0; loop_j--) {
-					if (ts->debug_log_level & 0x4)
+					if (ts->debug_log_level & 0x4) {
 						printk(KERN_INFO "i = %d, j = %d, A = %X, B = %X\n",
 							loop_i, loop_j, ((ts->finger_id >> (16 - 4 * loop_i)) & 0x000F),
 							((ts->p_finger_id >> (16 - 4 * loop_j)) & 0x000F));
+					}
 
 					if (((ts->finger_id >> (16 - 4 * loop_i)) & 0x000F)
 						== ((ts->p_finger_id >> (16 - 4 * loop_j)) & 0x000F)) {
@@ -763,22 +768,25 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 						break;
 					}
 				}
-				if (report > 0)
+				if (report > 0) {
 					break;
+				}
 			}
 			if (report >= ts->p_finger_count ||
-				report == ts->finger_count || ts->p_finger_count == 0)
+				report == ts->finger_count || ts->p_finger_count == 0) {
 				report = -1;
+			}
 		}
 		for (loop_i = 0; loop_i < ts->finger_count; loop_i++) {
 			finger_data[loop_i][0] = buf[base] << 8 | buf[base + 1];
 			finger_data[loop_i][1] = buf[base + 2] << 8 | buf[base + 3];
 			cy8c_orient(&finger_data[loop_i][0], &finger_data[loop_i][1], ts->orient);
 			finger_data[loop_i][2] = buf[base + 4];
-			if (loop_i % 2 == 1)
+			if (loop_i % 2 == 1) {
 				base += 7;
-			else
+			} else {
 				base += 6;
+			}
 		}
 		if (ts->filter_level[0] &&
 			((ts->finger_count > ts->p_finger_count) || report >= 0 || ts->grip_suppression)) {
@@ -790,126 +798,132 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 					ts->grip_suppression |= BIT(loop_i);
 				} else if ((finger_data[loop_i][0] < ts->filter_level[1] ||
 					finger_data[loop_i][0] > ts->filter_level[2]) &&
-					(ts->grip_suppression & BIT(loop_i)))
+					(ts->grip_suppression & BIT(loop_i))) {
 					ts->grip_suppression |= BIT(loop_i);
-				else if (finger_data[loop_i][0] > ts->filter_level[1] &&
+				} else if (finger_data[loop_i][0] > ts->filter_level[1] &&
 					finger_data[loop_i][0] < ts->filter_level[2]) {
 					ts->grip_suppression &= ~BIT(loop_i);
 				}
 			}
 			ts->ambiguous_state = 0;
-			for (loop_i = 0; loop_i < ts->finger_count; loop_i++)
-				if (((ts->grip_suppression >> loop_i) & 1) == 1)
+			for (loop_i = 0; loop_i < ts->finger_count; loop_i++) {
+				if (((ts->grip_suppression >> loop_i) & 1) == 1) {
 					ts->ambiguous_state++;
+				}
+			}
 		}
 
 		if (ts->ambiguous_state == ts->finger_count
 			|| ts->ambiguous_state == report) {
-			if (ts->flag_htc_event == 0)
+			if (ts->flag_htc_event == 0) {
 				input_mt_sync(ts->input_dev);
-			else {
+			} else {
 				input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
 				input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
 			}
 		} else {
-		if (report >= 0) {
-			if (ts->debug_log_level & 0x4)
-				printk(KERN_INFO "Change: %d\n", report);
-			if (report == 0) {
-				if (ts->flag_htc_event == 0) {
-					input_mt_sync(ts->input_dev);
-					input_sync(ts->input_dev);
-					ts->sameFilter[2] = ts->sameFilter[0] = ts->sameFilter[1] = -1;
-				} else {
-					input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
-					input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
+			if (report >= 0) {
+				if (ts->debug_log_level & 0x4) {
+					printk(KERN_INFO "Change: %d\n", report);
 				}
-			} else {
-				for (loop_i = 0; loop_i < report; loop_i++) {
-					if (!(ts->grip_suppression & BIT(loop_i))) {
-						if (ts->flag_htc_event == 0) {
-							if (!(finger_data[loop_i][2] == ts->sameFilter[2] &&
-								finger_data[loop_i][0] == ts->sameFilter[0] &&
-								finger_data[loop_i][1] == ts->sameFilter[1] &&
-								(buf[2] & 0x0F) == 1)) {
-								input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
-									finger_data[loop_i][2]);
-								input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
-									finger_data[loop_i][2]);
-								input_report_abs(ts->input_dev, ABS_MT_PRESSURE,
-									finger_data[loop_i][2]);
-								input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
-									finger_data[loop_i][0]);
-								input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
-									finger_data[loop_i][1]);
-								input_mt_sync(ts->input_dev);
-								ts->sameFilter[2] = finger_data[loop_i][2];
-								ts->sameFilter[0] = finger_data[loop_i][0];
-								ts->sameFilter[1] = finger_data[loop_i][1];
+				if (report == 0) {
+					if (ts->flag_htc_event == 0) {
+						input_mt_sync(ts->input_dev);
+						input_sync(ts->input_dev);
+						ts->sameFilter[2] = ts->sameFilter[0] = ts->sameFilter[1] = -1;
+					} else {
+						input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
+						input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
+					}
+				} else {
+					for (loop_i = 0; loop_i < report; loop_i++) {
+						if (!(ts->grip_suppression & BIT(loop_i))) {
+							if (ts->flag_htc_event == 0) {
+								if (!(finger_data[loop_i][2] == ts->sameFilter[2] &&
+									finger_data[loop_i][0] == ts->sameFilter[0] &&
+									finger_data[loop_i][1] == ts->sameFilter[1] &&
+									(buf[2] & 0x0F) == 1)) {
+									input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
+										finger_data[loop_i][2]);
+									input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
+										finger_data[loop_i][2]);
+									input_report_abs(ts->input_dev, ABS_MT_PRESSURE,
+										finger_data[loop_i][2]);
+									input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+										finger_data[loop_i][0]);
+									input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+										finger_data[loop_i][1]);
+									input_mt_sync(ts->input_dev);
+									ts->sameFilter[2] = finger_data[loop_i][2];
+									ts->sameFilter[0] = finger_data[loop_i][0];
+									ts->sameFilter[1] = finger_data[loop_i][1];
+								}
+							} else {
+								input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
+									finger_data[loop_i][2] << 16 | finger_data[loop_i][2]);
+								input_report_abs(ts->input_dev, ABS_MT_POSITION,
+									(((report - 1) ==  loop_i) ? BIT(31) : 0)
+									| finger_data[loop_i][0] << 16 | finger_data[loop_i][1]);
 							}
-						} else {
-							input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
-								finger_data[loop_i][2] << 16 | finger_data[loop_i][2]);
-							input_report_abs(ts->input_dev, ABS_MT_POSITION,
-								(((report - 1) ==  loop_i) ? BIT(31) : 0)
-								| finger_data[loop_i][0] << 16 | finger_data[loop_i][1]);
+							if (ts->debug_log_level & 0x2) {
+								printk(KERN_INFO "Finger %d=> X:%d, Y:%d w:%d, z:%d\n",
+									loop_i + 1, finger_data[loop_i][0], finger_data[loop_i][1],
+									finger_data[loop_i][2], finger_data[loop_i][2]);
+							}
 						}
-						if (ts->debug_log_level & 0x2)
-							printk(KERN_INFO "Finger %d=> X:%d, Y:%d w:%d, z:%d\n",
-								loop_i + 1, finger_data[loop_i][0], finger_data[loop_i][1],
-								finger_data[loop_i][2], finger_data[loop_i][2]);
+					}
+				}
+				if (ts->flag_htc_event == 0) {
+					input_sync(ts->input_dev);
+				}
+
+				base = 3;
+			}
+
+			for (loop_i = 0; loop_i < ts->finger_count; loop_i++) {
+				if (!(ts->grip_suppression & BIT(loop_i))) {
+					if (ts->flag_htc_event == 0) {
+						if (!(finger_data[loop_i][2] == ts->sameFilter[2] &&
+									finger_data[loop_i][0] == ts->sameFilter[0] &&
+									finger_data[loop_i][1] == ts->sameFilter[1] &&
+									(buf[2] & 0x0F) == 1)) {
+							input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
+								finger_data[loop_i][2]);
+							input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
+								finger_data[loop_i][2]);
+							input_report_abs(ts->input_dev, ABS_MT_PRESSURE,
+								finger_data[loop_i][2]);
+							input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
+								finger_data[loop_i][0]);
+							input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
+								finger_data[loop_i][1]);
+							input_mt_sync(ts->input_dev);
+							ts->sameFilter[2] = finger_data[loop_i][2];
+							ts->sameFilter[0] = finger_data[loop_i][0];
+							ts->sameFilter[1] = finger_data[loop_i][1];
+						}
+					} else {
+						input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
+							finger_data[loop_i][2] << 16 | finger_data[loop_i][2]);
+						input_report_abs(ts->input_dev, ABS_MT_POSITION,
+							(((ts->finger_count - 1) ==  loop_i) ? BIT(31) : 0)
+							| finger_data[loop_i][0] << 16 | finger_data[loop_i][1]);
+					}
+					if (ts->debug_log_level & 0x2) {
+						printk(KERN_INFO "Finger %d=> X:%d, Y:%d w:%d, z:%d\n",
+							loop_i + 1, finger_data[loop_i][0], finger_data[loop_i][1],
+							finger_data[loop_i][2], finger_data[loop_i][2]);
 					}
 				}
 			}
-			if (ts->flag_htc_event == 0)
-				input_sync(ts->input_dev);
-
-			base = 3;
-		}
-
-		for (loop_i = 0; loop_i < ts->finger_count; loop_i++) {
-			if (!(ts->grip_suppression & BIT(loop_i))) {
-				if (ts->flag_htc_event == 0) {
-					if (!(finger_data[loop_i][2] == ts->sameFilter[2] &&
-								finger_data[loop_i][0] == ts->sameFilter[0] &&
-								finger_data[loop_i][1] == ts->sameFilter[1] &&
-								(buf[2] & 0x0F) == 1)) {
-						input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
-							finger_data[loop_i][2]);
-						input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
-							finger_data[loop_i][2]);
-						input_report_abs(ts->input_dev, ABS_MT_PRESSURE,
-							finger_data[loop_i][2]);
-						input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
-							finger_data[loop_i][0]);
-						input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
-							finger_data[loop_i][1]);
-						input_mt_sync(ts->input_dev);
-						ts->sameFilter[2] = finger_data[loop_i][2];
-						ts->sameFilter[0] = finger_data[loop_i][0];
-						ts->sameFilter[1] = finger_data[loop_i][1];
-					}
-				} else {
-					input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
-						finger_data[loop_i][2] << 16 | finger_data[loop_i][2]);
-					input_report_abs(ts->input_dev, ABS_MT_POSITION,
-						(((ts->finger_count - 1) ==  loop_i) ? BIT(31) : 0)
-						| finger_data[loop_i][0] << 16 | finger_data[loop_i][1]);
-				}
-				if (ts->debug_log_level & 0x2)
-					printk(KERN_INFO "Finger %d=> X:%d, Y:%d w:%d, z:%d\n",
-						loop_i + 1, finger_data[loop_i][0], finger_data[loop_i][1],
-						finger_data[loop_i][2], finger_data[loop_i][2]);
-				}
-				if (!ts->first_pressed) {
-					ts->first_pressed = 1;
-					printk(KERN_INFO "S1@%d,%d\n",
-						finger_data[0][0], finger_data[0][1]);
-				}
-				if (ts->first_pressed == 1) {
-					ts->pre_finger_data[0] = finger_data[0][0];
-					ts->pre_finger_data[1] = finger_data[0][1];
-				}
+			if (!ts->first_pressed) {
+				ts->first_pressed = 1;
+				printk(KERN_INFO "S1@%d,%d\n",
+					finger_data[0][0], finger_data[0][1]);
+			}
+			if (ts->first_pressed == 1) {
+				ts->pre_finger_data[0] = finger_data[0][0];
+				ts->pre_finger_data[1] = finger_data[0][1];
 			}
 		}
 	} else {
@@ -932,8 +946,9 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 				ts->pre_finger_data[0] , ts->pre_finger_data[1]);
 		}
 
-		if (ts->debug_log_level & 0x2)
+		if (ts->debug_log_level & 0x2) {
 			printk(KERN_INFO "Finger leave\n");
+		}
 	}
 	if (ts->flag_htc_event == 0) {
 		input_report_key(ts->input_dev, BTN_TOUCH, (ts->finger_count > 0)?1:0);
