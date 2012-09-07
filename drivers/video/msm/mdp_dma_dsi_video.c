@@ -294,7 +294,6 @@ void mdp_dma_video_vsync_ctrl(int enable)
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	if (!enable)
 		INIT_COMPLETION(vsync_cntrl.vsync_wait);
-
 	vsync_cntrl.vsync_irq_enabled = enable;
 	if (!enable)
 		vsync_cntrl.disabled_clocks = 0;
