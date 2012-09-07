@@ -822,64 +822,6 @@ static irqreturn_t cy8c_ts_irq_thread(int irq, void *ptr)
 				input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
 			}
 		} else {
-			if (report >= 0) {
-				if (ts->debug_log_level & 0x4) {
-					printk(KERN_INFO "Change: %d\n", report);
-				}
-				if (report == 0) {
-					if (ts->flag_htc_event == 0) {
-						input_mt_sync(ts->input_dev);
-						input_sync(ts->input_dev);
-						ts->sameFilter[2] = ts->sameFilter[0] = ts->sameFilter[1] = -1;
-					} else {
-						input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE, 0);
-						input_report_abs(ts->input_dev, ABS_MT_POSITION, 1 << 31);
-					}
-				} else {
-					for (loop_i = 0; loop_i < report; loop_i++) {
-						if (!(ts->grip_suppression & BIT(loop_i))) {
-							if (ts->flag_htc_event == 0) {
-								if (!(finger_data[loop_i][2] == ts->sameFilter[2] &&
-									finger_data[loop_i][0] == ts->sameFilter[0] &&
-									finger_data[loop_i][1] == ts->sameFilter[1] &&
-									(buf[2] & 0x0F) == 1)) {
-									input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
-										finger_data[loop_i][2]);
-									input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
-										finger_data[loop_i][2]);
-									input_report_abs(ts->input_dev, ABS_MT_PRESSURE,
-										finger_data[loop_i][2]);
-									input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
-										finger_data[loop_i][0]);
-									input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
-										finger_data[loop_i][1]);
-									input_mt_sync(ts->input_dev);
-									ts->sameFilter[2] = finger_data[loop_i][2];
-									ts->sameFilter[0] = finger_data[loop_i][0];
-									ts->sameFilter[1] = finger_data[loop_i][1];
-								}
-							} else {
-								input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
-									finger_data[loop_i][2] << 16 | finger_data[loop_i][2]);
-								input_report_abs(ts->input_dev, ABS_MT_POSITION,
-									(((report - 1) ==  loop_i) ? BIT(31) : 0)
-									| finger_data[loop_i][0] << 16 | finger_data[loop_i][1]);
-							}
-							if (ts->debug_log_level & 0x2) {
-								printk(KERN_INFO "Finger %d=> X:%d, Y:%d w:%d, z:%d\n",
-									loop_i + 1, finger_data[loop_i][0], finger_data[loop_i][1],
-									finger_data[loop_i][2], finger_data[loop_i][2]);
-							}
-						}
-					}
-				}
-				if (ts->flag_htc_event == 0) {
-					input_sync(ts->input_dev);
-				}
-
-				base = 3;
-			}
-
 			for (loop_i = 0; loop_i < ts->finger_count; loop_i++) {
 				if (!(ts->grip_suppression & BIT(loop_i))) {
 					if (ts->flag_htc_event == 0) {
