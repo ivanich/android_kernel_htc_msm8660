@@ -26,6 +26,7 @@ depmod_hack_needed=true
 depmod_arch_hack_needed=false
 tmp_dir=$(mktemp -d ${TMPDIR:-/tmp}/depmod.XXXXXX)
 mkdir -p "$tmp_dir/lib/modules/$KERNELRELEASE"
+mkdir -p "$tmp_dir/usr/lib/modules/$KERNELRELEASE"
 if "$DEPMOD" -b "$tmp_dir" $KERNELRELEASE 2>/dev/null; then
 	if test -e "$tmp_dir/usr/lib/modules/$KERNELRELEASE/modules.dep" -o \
 	-e "$tmp_dir/usr/lib/modules/$KERNELRELEASE/modules.dep.bin"; then
