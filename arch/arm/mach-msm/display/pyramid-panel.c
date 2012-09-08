@@ -1216,10 +1216,7 @@ static struct msm_panel_common_pdata mdp_pdata = {
 #else
 	.mem_hid = MEMTYPE_EBI1,
 #endif
-	// unused old stuff
-	.mdp_core_clk_rate = 200000000,
-	.mdp_core_clk_table = mdp_core_clk_rate_table,
-	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
+	/* HTC additions */
 	.mdp_color_enhance = pyd_mdp_color_enhance,
 	.mdp_gamma = pyd_mdp_gamma,
 #if defined (CONFIG_FB_MSM_MDP_ABL)
