@@ -39,7 +39,9 @@
 #include <linux/fb.h>
 #endif
 
+#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
 void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size);
+#endif
 
 static struct regulator *l1_3v;
 static struct regulator *lvs1_1v8;
@@ -1165,18 +1167,21 @@ struct mdp_reg pyd_sharp_gamma[] = {
 
 int pyd_mdp_color_enhance(void)
 {
+#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
 	mdp_color_enhancement(pyd_color_v11, ARRAY_SIZE(pyd_color_v11));
+#endif
 
 	return 0;
 }
 
 int pyd_mdp_gamma(void)
 {
+#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
 	if (panel_type == PANEL_ID_PYD_SHARP)
 		mdp_color_enhancement(pyd_sharp_gamma, ARRAY_SIZE(pyd_sharp_gamma));
 	else
 		mdp_color_enhancement(pyd_auo_gamma, ARRAY_SIZE(pyd_auo_gamma));
-
+#endif
 	return 0;
 }
 
