@@ -1252,6 +1252,9 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 	msm_fb_device.resource = res;
 	msm_fb_device.num_resources = size;
 
+	mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
+	mdp_pdata.ov1_wb_size = MSM_FB_OVERLAY1_WRITEBACK_SIZE;
+
 #if 0
 	/* Cancel the fixup temporally due to it's cause flicking problem. */
 	if (panel_type == PANEL_ID_PYD_AUO_NT)
