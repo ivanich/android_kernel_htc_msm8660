@@ -466,6 +466,7 @@ static struct lcdc_platform_data lcdc_pdata = {
 	.lcdc_power_save   = lcdc_panel_power,
 };
 
+#if 0
 /* The solution provide by Novatek to fixup the problem of blank screen while
  * performing static electric strick. Only AUO panel need this function.
  */
@@ -482,6 +483,7 @@ int pyd_esd_fixup(uint32_t mfd_data)
 
 	return 0;
 }
+#endif
 
 static struct mipi_dsi_platform_data mipi_pdata = {
 	.vsync_gpio		= 28,
@@ -1245,7 +1247,7 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 	msm_fb_device.resource = res;
 	msm_fb_device.num_resources = size;
 
-#if 1
+#if 0
 	/* Cancel the fixup temporally due to it's cause flicking problem. */
 	if (panel_type == PANEL_ID_PYD_AUO_NT)
 		mipi_pdata.esd_fixup = pyd_esd_fixup;
