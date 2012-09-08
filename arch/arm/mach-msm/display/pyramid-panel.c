@@ -29,6 +29,7 @@
 #include <mach/msm_iomap.h>
 #include <mach/panel_id.h>
 #include <mach/msm_bus_board.h>
+#include <mach/msm_memtypes.h>
 #include <mach/debug_display.h>
 
 #include "../devices.h"
@@ -1205,12 +1206,20 @@ static struct gamma_curvy gamma_tbl = {
 
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = 28,
-	.mdp_core_clk_rate = 200000000,
-	.mdp_core_clk_table = mdp_core_clk_rate_table,
-	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
+	.mdp_max_clk = 200000000,
 #ifdef CONFIG_MSM_BUS_SCALING
 	.mdp_bus_scale_table = &mdp_bus_scale_pdata,
 #endif
+	.mdp_rev = MDP_REV_41,
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	.mem_hid = BIT(ION_CP_WB_HEAP_ID),
+#else
+	.mem_hid = MEMTYPE_EBI1,
+#endif
+	// unused old stuff
+	.mdp_core_clk_rate = 200000000,
+	.mdp_core_clk_table = mdp_core_clk_rate_table,
+	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
 	.mdp_color_enhance = pyd_mdp_color_enhance,
 	.mdp_gamma = pyd_mdp_gamma,
 #if defined (CONFIG_FB_MSM_MDP_ABL)
