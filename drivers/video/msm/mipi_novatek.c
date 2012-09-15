@@ -453,6 +453,8 @@ static int __devinit mipi_novatek_lcd_probe(struct platform_device *pdev)
 	static char dlane_swap;
 
 	if (pdev->id == 0) {
+		pr_info("mipi_novatek_lcd_probe: pdev id 0: adding device: %s\n", pdev->name);
+
 		mipi_novatek_pdata = pdev->dev.platform_data;
 
 		if (mipi_novatek_pdata
@@ -481,23 +483,32 @@ static int __devinit mipi_novatek_lcd_probe(struct platform_device *pdev)
 		return 0;
 	}
 
+	pr_info("mipi_novatek_lcd_probe: adding device: %s\n", pdev->name);
+
 	current_pdev = msm_fb_add_device(pdev);
 
+	pr_info("mipi_novatek_lcd_probe: added device\n");
+
 	if (current_pdev) {
+		pr_info("mipi_novatek_lcd_probe: getting current_pdev\n");
 		mfd = platform_get_drvdata(current_pdev);
 		if (!mfd)
 			return -ENODEV;
 		if (mfd->key != MFD_KEY)
 			return -EINVAL;
 
-		mipi  = &mfd->panel_info.mipi;
+		pr_info("mipi_novatek_lcd_probe: getting mipi\n");
+		mipi = &mfd->panel_info.mipi;
 
+		pr_info("mipi_novatek_lcd_probe: setting dsi_phy_db\n");
 		if (phy_settings != NULL)
 			mipi->dsi_phy_db = phy_settings;
 
+		pr_info("mipi_novatek_lcd_probe: setting dlane_swap\n");
 		if (dlane_swap)
 			mipi->dlane_swap = dlane_swap;
 	}
+	pr_info("mipi_novatek_lcd_probe: finished probe\n");
 	return 0;
 }
 

@@ -590,6 +590,7 @@ static struct platform_device mipi_dsi_cmd_sharp_qhd_panel_device = {
 
 static int msm_fb_detect_panel(const char *name)
 {
+	pr_info("msm_fb_detect_panel: detecting panel\n");
 	if (!strcmp(name, "mipi_cmd_novatek_qhd"))
 		return 0;
 
@@ -1272,11 +1273,13 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 		mipi_pdata.esd_fixup = pyd_esd_fixup;
 #endif
 
+	PR_DISP_INFO("%s: adding msm_fb\n", __func__);
 	ret = platform_device_register(&msm_fb_device);
 	ret = platform_device_register(&lcdc_samsung_panel_device);
 	ret = platform_device_register(&mipi_dsi_video_sharp_wvga_panel_device);
 	ret = platform_device_register(&mipi_dsi_cmd_sharp_qhd_panel_device);
 
+	PR_DISP_INFO("%s: adding msm_fb devices\n", __func__);
 	msm_fb_add_devices();
 
 	return 0;
