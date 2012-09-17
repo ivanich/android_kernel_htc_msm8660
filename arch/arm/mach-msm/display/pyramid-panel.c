@@ -523,6 +523,7 @@ static struct platform_device lcdc_samsung_panel_device = {
 #define SHARP_PWM_DEFAULT               69	/* 27% of max pwm  */
 #define SHARP_PWM_MAX                   194	/* 76% of max pwm */
 
+#if 0
 static unsigned char pyd_shp_shrink_pwm(int br)
 {
 	unsigned char shrink_br = BRI_SETTING_MAX;
@@ -574,9 +575,9 @@ static unsigned char pyd_auo_shrink_pwm(int br)
 
 	return shrink_br;
 }
+#endif
 
-static struct msm_panel_common_pdata mipi_novatek_panel_data = {
-	.shrink_pwm = NULL,
+static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
 };
 
 static struct platform_device mipi_dsi_cmd_sharp_qhd_panel_device = {
@@ -1247,10 +1248,12 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 	int ret;
 
 	PR_DISP_INFO("%s: res=%p, size=%d\n", __func__, res, size);
+#if 0
 	if (panel_type == PANEL_ID_PYD_SHARP)
 		mipi_novatek_panel_data.shrink_pwm = pyd_shp_shrink_pwm;
 	else
 		mipi_novatek_panel_data.shrink_pwm = pyd_auo_shrink_pwm;
+#endif
 
 	if (panel_type == PANEL_ID_PYD_SHARP)
 		mdp_pdata.color_enhancment_tbl = pyd_sharp_gamma;
