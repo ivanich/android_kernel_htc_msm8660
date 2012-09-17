@@ -117,7 +117,7 @@
 #include "spm.h"
 #include "rpm_log.h"
 #include "timer.h"
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 #include <mach/mhl.h>
 #endif
 #include "gpiomux-8x60.h"
@@ -1929,10 +1929,12 @@ static struct resource msm_fb_resources[] = {
 	{
 		.flags  = IORESOURCE_DMA,
 	},
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 	/* for overlay write back operation */
 	{
 		.flags  = IORESOURCE_DMA,
 	},
+#endif
 };
 
 #ifdef CONFIG_ANDROID_PMEM
@@ -2092,16 +2094,19 @@ static struct platform_device android_pmem_smipool_device = {
 
 static void __init msm8x60_allocate_memory_regions(void)
 {
+	void *addr;
 	unsigned long size;
 
 	size = MSM_FB_SIZE;
-	msm_fb_resources[0].start = MSM_FB_BASE;
+
+	addr = alloc_bootmem_align(size, 0x1000);
+	msm_fb_resources[0].start = __pa(addr);
 	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
 	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for fb\n",
-		size, __va(MSM_FB_BASE), (unsigned long) MSM_FB_BASE);
+		size, addr, __pa(addr));
 
-#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
-	size = MSM_FB_WRITEBACK_SIZE;
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
+	size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
 	msm_fb_resources[1].start = MSM_FB_WRITEBACK_BASE;
 	msm_fb_resources[1].end = msm_fb_resources[1].start + size - 1;
 	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for overlay\n",
@@ -2995,7 +3000,7 @@ static struct platform_device ram_console_device = {
 	.resource	= ram_console_resources,
 };
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static void mhl_sii9234_1v2_power(bool enable);
 #endif
 
@@ -3066,7 +3071,7 @@ static void pyramid_usb_dpdn_switch(int path)
 	}
 	}
 
-	#ifdef CONFIG_FB_MSM_HDMI_MHL
+	#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	sii9234_change_usb_owner((path == PATH_MHL)?1:0);
 	#endif
 }
@@ -3084,7 +3089,7 @@ static struct cable_detect_platform_data cable_detect_pdata = {
 		.usbid_amux	= PM_MPP_AIN_AMUX_CH5,
 	},
 	.config_usb_id_gpios = config_pyramid_usb_id_gpios,
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
 #endif
 };
@@ -3154,7 +3159,7 @@ static struct platform_device pm8058_leds = {
 	},
 };
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static struct regulator *reg_8901_l0;
 static struct regulator *reg_8058_l19;
 static struct regulator *reg_8901_l3;
@@ -3269,7 +3274,6 @@ static int mhl_sii9234_all_power(bool enable)
 	return 0;
 }
 
-#ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
 static uint32_t mhl_gpio_table[] = {
 	GPIO_CFG(PYRAMID_GPIO_MHL_RESET, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 	GPIO_CFG(PYRAMID_GPIO_MHL_INT, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),
@@ -3297,10 +3301,8 @@ static T_MHL_PLATFORM_DATA mhl_sii9234_device_data = {
 	.gpio_intr = PYRAMID_GPIO_MHL_INT,
 	.gpio_reset = PYRAMID_GPIO_MHL_RESET,
 	.ci2ca = 0,
-	#ifdef CONFIG_FB_MSM_HDMI_MHL
 	.mhl_usb_switch		= pyramid_usb_dpdn_switch,
 	.mhl_1v2_power = mhl_sii9234_1v2_power,
-	#endif
 	.power = mhl_sii9234_power,
 };
 
@@ -3312,7 +3314,6 @@ static struct i2c_board_info msm_i2c_gsbi7_mhl_sii9234_info[] =
 		.irq = MSM_GPIO_TO_INT(PYRAMID_GPIO_MHL_INT)
 	},
 };
-#endif
 #endif
 
 
@@ -4755,17 +4756,13 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		ARRAY_SIZE(msm_i2c_gsbi7_tpa2051d3_info),
 	},
 #endif
-#ifdef CONFIG_FB_MSM_HDMI_MHL
 #ifdef CONFIG_FB_MSM_HDMI_MHL_SII9234
-
 	{
 		I2C_SURF | I2C_FFA,
 		MSM_GSBI7_QUP_I2C_BUS_ID,
 		msm_i2c_gsbi7_mhl_sii9234_info,
 		ARRAY_SIZE(msm_i2c_gsbi7_mhl_sii9234_info),
 	},
-
-#endif
 #endif
 	{
 		I2C_SURF | I2C_FFA,
@@ -5935,6 +5932,114 @@ error:
 	return rc;
 }
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
+
+#ifdef CONFIG_MSM_BUS_SCALING
+
+static struct msm_bus_vectors rotator_init_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = 0,
+		.ib = 0,
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 0,
+		.ib = 0,
+	},
+};
+
+static struct msm_bus_vectors rotator_ui_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = 0,
+		.ib = 0,
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = (1024 * 600 * 4 * 2 * 60),
+		.ib = (1024 * 600 * 4 * 2 * 60 * 1.5),
+	},
+};
+
+static struct msm_bus_vectors rotator_vga_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab = (640 * 480 * 2 * 2 * 30),
+		.ib = (640 * 480 * 2 * 2 * 30 * 1.5),
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = (640 * 480 * 2 * 2 * 30),
+		.ib = (640 * 480 * 2 * 2 * 30 * 1.5),
+	},
+};
+
+static struct msm_bus_vectors rotator_720p_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab  = (1280 * 736 * 2 * 2 * 30),
+		.ib  = (1280 * 736 * 2 * 2 * 30 * 1.5),
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = (1280 * 736 * 2 * 2 * 30),
+		.ib  = (1280 * 736 * 2 * 2 * 30 * 1.5),
+	},
+};
+
+static struct msm_bus_vectors rotator_1080p_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_SMI,
+		.ab  = (1920 * 1088 * 2 * 2 * 30),
+		.ib  = (1920 * 1088 * 2 * 2 * 30 * 1.5),
+	},
+	{
+		.src = MSM_BUS_MASTER_ROTATOR,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = (1920 * 1088 * 2 * 2 * 30),
+		.ib  = (1920 * 1088 * 2 * 2 * 30 * 1.5),
+	},
+};
+
+static struct msm_bus_paths rotator_bus_scale_usecases[] = {
+	{
+		ARRAY_SIZE(rotator_init_vectors),
+		rotator_init_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_ui_vectors),
+		rotator_ui_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_vga_vectors),
+		rotator_vga_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_720p_vectors),
+		rotator_720p_vectors,
+	},
+	{
+		ARRAY_SIZE(rotator_1080p_vectors),
+		rotator_1080p_vectors,
+	},
+};
+
+struct msm_bus_scale_pdata rotator_bus_scale_pdata = {
+	rotator_bus_scale_usecases,
+	ARRAY_SIZE(rotator_bus_scale_usecases),
+	.name = "rotator",
+};
+
+#endif
 
 #ifdef CONFIG_FB_MSM_TVOUT
 static struct regulator *reg_8058_l13;
