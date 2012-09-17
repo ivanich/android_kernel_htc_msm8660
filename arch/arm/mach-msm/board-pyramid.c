@@ -1929,10 +1929,12 @@ static struct resource msm_fb_resources[] = {
 	{
 		.flags  = IORESOURCE_DMA,
 	},
+#ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 	/* for overlay write back operation */
 	{
 		.flags  = IORESOURCE_DMA,
 	},
+#endif
 };
 
 #ifdef CONFIG_ANDROID_PMEM
