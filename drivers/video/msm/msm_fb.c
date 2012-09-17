@@ -329,7 +329,7 @@ static int msm_fb_probe(struct platform_device *pdev)
 	int rc;
 	int err = 0;
 
-	MSM_FB_INFO("msm_fb_probe: entering\n");
+	MSM_FB_DEBUG("msm_fb_probe\n");
 
 	if ((pdev->id == 0) && (pdev->num_resources > 0)) {
 		msm_fb_pdata = pdev->dev.platform_data;
@@ -342,8 +342,8 @@ static int msm_fb_probe(struct platform_device *pdev)
 			printk(KERN_ERR "fbram ioremap failed!\n");
 			return -ENOMEM;
 		}
-		MSM_FB_INFO("msm_fb_probe:  phy_Addr = 0x%x virt = 0x%x size = 0x%x\n",
-			     (int)fbram_phys, (int)fbram, (int)fbram_size);
+		MSM_FB_DEBUG("msm_fb_probe:  phy_Addr = 0x%x virt = 0x%x\n",
+			     (int)fbram_phys, (int)fbram);
 
 		iclient = msm_ion_client_create(-1, pdev->name);
 		if (IS_ERR_OR_NULL(iclient)) {
@@ -352,7 +352,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 			iclient = NULL;
 		}
 
-		MSM_FB_INFO("msm_fb_probe: about to exit\n");
 		msm_fb_resource_initialized = 1;
 		return 0;
 	}
@@ -360,11 +359,7 @@ static int msm_fb_probe(struct platform_device *pdev)
 	if (!msm_fb_resource_initialized)
 		return -EPERM;
 
-	MSM_FB_INFO("msm_fb_probe: getting drvdata\n");
-
 	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
-
-	MSM_FB_INFO("msm_fb_probe: got drvdata\n");
 
 	if (!mfd)
 		return -ENODEV;
@@ -374,8 +369,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 
 	if (pdev_list_cnt >= MSM_FB_MAX_DEV_LIST)
 		return -ENOMEM;
-
-	MSM_FB_INFO("msm_fb_probe: setting mfd\n");
 
 	vsync_cntrl.dev = mfd->fbi->dev;
 	mfd->panel_info.frame_count = 0;
@@ -388,21 +381,13 @@ static int msm_fb_probe(struct platform_device *pdev)
 
 	bf_supported = mdp4_overlay_borderfill_supported();
 
-	MSM_FB_INFO("msm_fb_probe: registering mfd\n");
-
 	rc = msm_fb_register(mfd);
 	if (rc)
 		return rc;
-
-	MSM_FB_INFO("msm_fb_probe: set pm active\n");
 	err = pm_runtime_set_active(mfd->fbi->dev);
 	if (err < 0)
 		printk(KERN_ERR "pm_runtime: fail to set active.\n");
-
-	MSM_FB_INFO("msm_fb_probe: enable pm\n");
 	pm_runtime_enable(mfd->fbi->dev);
-
-	MSM_FB_INFO("msm_fb_probe: configure backlight\n");
 #ifdef CONFIG_FB_BACKLIGHT
 	msm_fb_config_backlight(mfd);
 #else
@@ -414,8 +399,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 			lcd_backlight_registered = 1;
 	}
 #endif
-
-	MSM_FB_INFO("msm_fb_probe: exiting\n");
 
 	pdev_list[pdev_list_cnt++] = pdev;
 	msm_fb_create_sysfs(pdev);
@@ -1100,8 +1083,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		MSM_SUBSYSTEM_ROTATOR};
 	unsigned int flags = MSM_SUBSYSTEM_MAP_IOVA;
 
-	MSM_FB_INFO("msm_fb_register: begin fb info init\n");
-
 	/*
 	 * fb info initialization
 	 */
@@ -1126,8 +1107,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	var->sync = 0,	/* see FB_SYNC_* */
 	var->rotate = 0,	/* angle we rotate counter clockwise */
 	mfd->op_enable = FALSE;
-
-	MSM_FB_INFO("msm_fb_register: set imgType\n");
 
 	switch (mfd->fb_imgType) {
 	case MDP_RGB_565:
@@ -1235,8 +1214,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		return ret;
 	}
 
-	MSM_FB_INFO("msm_fb_register: set line length\n");
-
 	fix->type = panel_info->is_3d_panel;
 
 	fix->line_length = msm_fb_line_length(mfd->index, panel_info->xres,
@@ -1253,8 +1230,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 				panel_info->mode2_yres) & (PAGE_SIZE - 1);
 	if (!remainder_mode2)
 		remainder_mode2 = PAGE_SIZE;
-
-	MSM_FB_INFO("msm_fb_register: set smem_len\n");
 
 	/*
 	 * calculate smem_len based on max size of two supplied modes.
@@ -1277,8 +1252,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 			__func__, __LINE__, mfd->index);
 		fix->smem_len = 0;
 	}
-
-	MSM_FB_INFO("msm_fb_register: set params from panel info\n");
 
 	mfd->var_xres = panel_info->xres;
 	mfd->var_yres = panel_info->yres;
@@ -1319,8 +1292,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		 */
 	id = (int *)&mfd->panel;
 
-	MSM_FB_INFO("msm_fb_register: set mdp_rev\n");
-
 	switch (mdp_rev) {
 	case MDP_REV_20:
 		snprintf(fix->id, sizeof(fix->id), "msmfb20_%x", (__u32) *id);
@@ -1357,24 +1328,20 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		break;
 	}
 
-	MSM_FB_INFO("msm_fb_register: set fb ops\n");
 	fbi->fbops = &msm_fb_ops;
 	fbi->flags = FBINFO_FLAG_DEFAULT;
 	fbi->pseudo_palette = msm_fb_pseudo_palette;
 
-	MSM_FB_INFO("msm_fb_register: set panel refreshing\n");
 	mfd->ref_cnt = 0;
 	mfd->sw_currently_refreshing = FALSE;
 	mfd->sw_refreshing_enable = TRUE;
 	mfd->panel_power_on = FALSE;
 
-	MSM_FB_INFO("msm_fb_register: init pan/refresh\n");
 	mfd->pan_waiting = FALSE;
 	init_completion(&mfd->pan_comp);
 	init_completion(&mfd->refresher_comp);
 	sema_init(&mfd->sem, 1);
 
-	MSM_FB_INFO("msm_fb_register: init update notify timer\n");
 	init_timer(&mfd->msmfb_no_update_notify_timer);
 	mfd->msmfb_no_update_notify_timer.function =
 			msmfb_no_update_notify_timer_cb;
@@ -1382,7 +1349,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	init_completion(&mfd->msmfb_update_notify);
 	init_completion(&mfd->msmfb_no_update_notify);
 
-	MSM_FB_INFO("msm_fb_register: set fbram offset\n");
 	fbram_offset = PAGE_ALIGN((int)fbram)-(int)fbram;
 	fbram += fbram_offset;
 	fbram_phys += fbram_offset;
@@ -1397,7 +1363,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	fbi->screen_base = fbram;
 	fbi->fix.smem_start = (unsigned long)fbram_phys;
 
-	MSM_FB_INFO("msm_fb_register: do msm_subsystem_map_buffer\n");
 	mfd->map_buffer = msm_subsystem_map_buffer(
 		fbi->fix.smem_start, fbi->fix.smem_len,
 		flags, subsys_id, 2);
@@ -1407,16 +1372,11 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 			fbi->fix.smem_start, mfd->map_buffer->iova[0],
 			mfd->map_buffer->iova[1]);
 	}
-
-	MSM_FB_INFO("msm_fb_register: memset screen memory: 0x%x size: 0x%x\n",
-			(int)fbi->screen_base, (int)fix->smem_len);
 	if (!bf_supported || mfd->index == 0)
 		memset(fbi->screen_base, 0x0, fix->smem_len);
 
 	mfd->op_enable = TRUE;
 	mfd->panel_power_on = FALSE;
-
-	MSM_FB_INFO("msm_fb_register: alloc cursor mem\n");
 
 	/* cursor memory allocation */
 	if (mfd->cursor_update) {
@@ -1434,8 +1394,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 			printk(KERN_ERR "%s: fb_alloc_cmap() failed!\n",
 					__func__);
 	}
-
-	MSM_FB_INFO("msm_fb_register: register_framebuffer\n");
 
 	if (register_framebuffer(fbi) < 0) {
 		if (mfd->lut_update)
@@ -1465,8 +1423,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		;
 #endif
 	ret = 0;
-
-	MSM_FB_INFO("msm_fb_register: setting earlysuspend\n");
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	if (mfd->panel_info.type != DTV_PANEL) {
@@ -1603,8 +1559,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		}
 	}
 #endif /* MSM_FB_ENABLE_DBGFS */
-
-	MSM_FB_INFO("msm_fb_register: exiting\n");
 
 	return ret;
 }
@@ -3704,14 +3658,10 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 		printk(KERN_ERR "msm_fb: no more framebuffer info list!\n");
 		return NULL;
 	}
-
-	MSM_FB_INFO("msm_fb_device_alloc: PRE\n");
 	/*
 	 * alloc panel device data
 	 */
 	this_dev = msm_fb_device_alloc(pdata, type, id);
-
-	MSM_FB_INFO("msm_fb_device_alloc: POST\n");
 
 	if (!this_dev) {
 		printk(KERN_ERR
@@ -3729,7 +3679,6 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 		return NULL;
 	}
 
-	MSM_FB_INFO("msm_fb_add_device: filling out mfd\n");
 	mfd = (struct msm_fb_data_type *)fbi->par;
 	mfd->key = MFD_KEY;
 	mfd->fbi = fbi;
@@ -3744,14 +3693,11 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 
 	mfd_list[mfd_list_index++] = mfd;
 	fbi_list[fbi_list_index++] = fbi;
-	MSM_FB_INFO("msm_fb_add_device: filled out mfd\n");
 
 	/*
 	 * set driver data
 	 */
 	platform_set_drvdata(this_dev, mfd);
-
-	MSM_FB_INFO("msm_fb_add_device: set_drvdata\n");
 
 	if (platform_device_add(this_dev)) {
 		printk(KERN_ERR "msm_fb: platform_device_add failed!\n");
@@ -3760,9 +3706,6 @@ struct platform_device *msm_fb_add_device(struct platform_device *pdev)
 		fbi_list_index--;
 		return NULL;
 	}
-
-	MSM_FB_INFO("msm_fb_add_device: returning this device\n");
-
 	return this_dev;
 }
 EXPORT_SYMBOL(msm_fb_add_device);
@@ -3800,8 +3743,6 @@ EXPORT_SYMBOL(get_fb_phys_info);
 int __init msm_fb_init(void)
 {
 	int rc = -ENODEV;
-
-	MSM_FB_INFO("msm_fb_init: initializing msm_fb\n");
 
 	if (msm_fb_register_driver())
 		return rc;
