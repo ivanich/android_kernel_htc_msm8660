@@ -406,25 +406,6 @@ static int mipi_panel_power(int on)
 	return 0;
 }
 
-#if 0
-/* The solution provide by Novatek to fixup the problem of blank screen while
- * performing static electric strick. Only AUO panel need this function.
- */
-int pyd_esd_fixup(uint32_t mfd_data)
-{
-	/* do two read_scan_line consecutively to avoid flicking */
-	if (mipi_novatek_read_scan_line(mfd_data) == 0xf7ff) {
-		hr_msleep(1);
-		if (mipi_novatek_read_scan_line(mfd_data) == 0xf7ff) {
-			pr_info("%s\n", __func__);
-			mipi_novatek_restart_vcounter(mfd_data);
-		}
-	}
-
-	return 0;
-}
-#endif
-
 static struct mipi_dsi_platform_data mipi_pdata = {
 	.vsync_gpio		= 28,
 	.dsi_power_save		= mipi_panel_power,
@@ -434,68 +415,6 @@ static struct platform_device mipi_dsi_video_sharp_wvga_panel_device = {
 	.name = "dsi_video_sharp_wvga",
 	.id = 0,
 };
-
-#define BRI_SETTING_MIN                 30
-#define BRI_SETTING_DEF                 143
-#define BRI_SETTING_MAX                 255
-
-#define SHARP_PWM_MIN                   9	/* 3.5% of max pwm */
-#define SHARP_PWM_DEFAULT               69	/* 27% of max pwm  */
-#define SHARP_PWM_MAX                   194	/* 76% of max pwm */
-
-#if 0
-static unsigned char pyd_shp_shrink_pwm(int br)
-{
-	unsigned char shrink_br = BRI_SETTING_MAX;
-
-	if (br <= 0) {
-		shrink_br = 0;
-	} else if (br > 0 && br <= BRI_SETTING_MIN) {
-		shrink_br = SHARP_PWM_MIN;
-	} else if (br > BRI_SETTING_MIN && br <= BRI_SETTING_DEF) {
-		shrink_br = (SHARP_PWM_MIN + (br - BRI_SETTING_MIN) *
-				(SHARP_PWM_DEFAULT - SHARP_PWM_MIN) /
-				(BRI_SETTING_DEF - BRI_SETTING_MIN));
-	} else if (br > BRI_SETTING_DEF && br <= BRI_SETTING_MAX) {
-		shrink_br = (SHARP_PWM_DEFAULT + (br - BRI_SETTING_DEF) *
-				(SHARP_PWM_MAX - SHARP_PWM_DEFAULT) /
-				(BRI_SETTING_MAX - BRI_SETTING_DEF));
-	} else if (br > BRI_SETTING_MAX)
-		shrink_br = SHARP_PWM_MAX;
-	/* TODO: remove log later */
-	PR_DISP_INFO("SHP: brightness orig=%d, transformed=%d\n", br, shrink_br);
-
-	return shrink_br;
-}
-
-#define AUO_PWM_MIN                     9	/* 3.5% of max pwm */
-#define AUO_PWM_DEFAULT                 87	/* 34% of max pwm  */
-#define AUO_PWM_MAX                     255	/* 100% of max pwm  */
-
-static unsigned char pyd_auo_shrink_pwm(int br)
-{
-	unsigned char shrink_br = 0;
-
-	if (br <= 0) {
-		shrink_br = 0;
-	} else if (br > 0 && br <= BRI_SETTING_MIN) {
-		shrink_br = AUO_PWM_MIN;
-	} else if (br > BRI_SETTING_MIN && br <= BRI_SETTING_DEF) {
-		shrink_br = (AUO_PWM_MIN + (br - BRI_SETTING_MIN) *
-				(AUO_PWM_DEFAULT - AUO_PWM_MIN) /
-				(BRI_SETTING_DEF - BRI_SETTING_MIN));
-	} else if (br > BRI_SETTING_DEF && br <= BRI_SETTING_MAX) {
-		shrink_br = (AUO_PWM_DEFAULT + (br - BRI_SETTING_DEF) *
-				(AUO_PWM_MAX - AUO_PWM_DEFAULT) /
-				(BRI_SETTING_MAX - BRI_SETTING_DEF));
-	} else if (br > BRI_SETTING_MAX)
-		shrink_br = AUO_PWM_MAX;
-	/* TODO: remove log later */
-	PR_DISP_INFO("AUO: brightness orig=%d, transformed=%d\n", br, shrink_br);
-
-	return shrink_br;
-}
-#endif
 
 static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
 };
@@ -1167,12 +1086,6 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 	int ret;
 
 	PR_DISP_INFO("%s: res=%p, size=%d\n", __func__, res, size);
-#if 0
-	if (panel_type == PANEL_ID_PYD_SHARP)
-		mipi_novatek_panel_data.shrink_pwm = pyd_shp_shrink_pwm;
-	else
-		mipi_novatek_panel_data.shrink_pwm = pyd_auo_shrink_pwm;
-#endif
 
 	if (panel_type == PANEL_ID_PYD_SHARP)
 		mdp_pdata.color_enhancment_tbl = pyd_sharp_gamma;
@@ -1184,12 +1097,6 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 
 	mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
 	mdp_pdata.ov1_wb_size = MSM_FB_OVERLAY1_WRITEBACK_SIZE;
-
-#if 0
-	/* Cancel the fixup temporally due to it's cause flicking problem. */
-	if (panel_type == PANEL_ID_PYD_AUO_NT)
-		mipi_pdata.esd_fixup = pyd_esd_fixup;
-#endif
 
 	ret = platform_device_register(&msm_fb_device);
 	ret = platform_device_register(&mipi_dsi_video_sharp_wvga_panel_device);
