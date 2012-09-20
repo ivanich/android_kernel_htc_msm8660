@@ -40,10 +40,6 @@
 #include <linux/fb.h>
 #endif
 
-#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
-void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size);
-#endif
-
 static struct regulator *l1_3v;
 static struct regulator *lvs1_1v8;
 static struct regulator *l4_1v8;
@@ -1008,26 +1004,6 @@ struct mdp_reg pyd_sharp_gamma[] = {
 	{0x90070, 0x1F, 0x0},
 };
 
-int pyd_mdp_color_enhance(void)
-{
-#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
-	mdp_color_enhancement(pyd_color_v11, ARRAY_SIZE(pyd_color_v11));
-#endif
-
-	return 0;
-}
-
-int pyd_mdp_gamma(void)
-{
-#ifdef CONFIG_MDP_COLOR_ENHANCEMENT
-	if (panel_type == PANEL_ID_PYD_SHARP)
-		mdp_color_enhancement(pyd_sharp_gamma, ARRAY_SIZE(pyd_sharp_gamma));
-	else
-		mdp_color_enhancement(pyd_auo_gamma, ARRAY_SIZE(pyd_auo_gamma));
-#endif
-	return 0;
-}
-
 #if defined (CONFIG_FB_MSM_MDP_ABL)
 static struct gamma_curvy gamma_tbl = {
 	.gamma_len = 33,
@@ -1057,8 +1033,6 @@ static struct msm_panel_common_pdata mdp_pdata = {
 	.mem_hid = MEMTYPE_EBI1,
 #endif
 	/* HTC additions */
-	.mdp_color_enhance = pyd_mdp_color_enhance,
-	.mdp_gamma = pyd_mdp_gamma,
 #if defined (CONFIG_FB_MSM_MDP_ABL)
 	.abl_gamma_tbl = &gamma_tbl,
 #endif
