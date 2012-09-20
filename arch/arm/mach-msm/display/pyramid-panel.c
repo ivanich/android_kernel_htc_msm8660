@@ -197,65 +197,6 @@ fail:
 	}
 }
 
-/*
-TODO:
-1. remove unused LCDC stuff.
-*/
-static uint32_t lcd_panel_gpios[] = {
-	GPIO_CFG(0,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_pclk */
-	GPIO_CFG(1,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_hsync*/
-	GPIO_CFG(2,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_vsync*/
-	GPIO_CFG(3,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_den */
-	GPIO_CFG(4,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red7 */
-	GPIO_CFG(5,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red6 */
-	GPIO_CFG(6,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red5 */
-	GPIO_CFG(7,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red4 */
-	GPIO_CFG(8,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red3 */
-	GPIO_CFG(9,  1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red2 */
-	GPIO_CFG(10, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red1 */
-	GPIO_CFG(11, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_red0 */
-	GPIO_CFG(12, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn7 */
-	GPIO_CFG(13, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn6 */
-	GPIO_CFG(14, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn5 */
-	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn4 */
-	GPIO_CFG(16, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn3 */
-	GPIO_CFG(17, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn2 */
-	GPIO_CFG(18, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn1 */
-	GPIO_CFG(19, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_grn0 */
-	GPIO_CFG(20, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu7 */
-	GPIO_CFG(21, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu6 */
-	GPIO_CFG(22, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu5 */
-	GPIO_CFG(23, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu4 */
-	GPIO_CFG(24, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu3 */
-	GPIO_CFG(25, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu2 */
-	GPIO_CFG(26, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu1 */
-	GPIO_CFG(27, 1, GPIO_CFG_OUTPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_16MA), /* lcdc_blu0 */
-};
-
-static void lcdc_samsung_panel_power(int on)
-{
-	int n;
-
-	/*TODO if on = 0 free the gpio's */
-	for (n = 0; n < ARRAY_SIZE(lcd_panel_gpios); ++n)
-		gpio_tlmm_config(lcd_panel_gpios[n], 0);
-}
-
-static int lcdc_panel_power(int on)
-{
-	int flag_on = !!on;
-	static int lcdc_power_save_on;
-
-	if (lcdc_power_save_on == flag_on)
-		return 0;
-
-	lcdc_power_save_on = flag_on;
-
-	lcdc_samsung_panel_power(on);
-
-	return 0;
-}
-
 #ifdef CONFIG_MSM_BUS_SCALING
 static struct msm_bus_vectors mdp_init_vectors[] = {
 	/* For now, 0th array entry is reserved.
@@ -465,10 +406,6 @@ static int mipi_panel_power(int on)
 	return 0;
 }
 
-static struct lcdc_platform_data lcdc_pdata = {
-	.lcdc_power_save   = lcdc_panel_power,
-};
-
 #if 0
 /* The solution provide by Novatek to fixup the problem of blank screen while
  * performing static electric strick. Only AUO panel need this function.
@@ -496,23 +433,6 @@ static struct mipi_dsi_platform_data mipi_pdata = {
 static struct platform_device mipi_dsi_video_sharp_wvga_panel_device = {
 	.name = "dsi_video_sharp_wvga",
 	.id = 0,
-};
-
-#define GPIO_BACKLIGHT_PWM0 0
-#define GPIO_BACKLIGHT_PWM1 1
-
-static int pmic_backlight_gpio[2]
-= { GPIO_BACKLIGHT_PWM0, GPIO_BACKLIGHT_PWM1 };
-static struct msm_panel_common_pdata lcdc_samsung_panel_data = {
-	.gpio_num = pmic_backlight_gpio, /* two LPG CHANNELS for backlight */
-};
-
-static struct platform_device lcdc_samsung_panel_device = {
-	.name = "lcdc_samsung_wsvga",
-	.id = 0,
-	.dev = {
-		.platform_data = &lcdc_samsung_panel_data,
-	}
 };
 
 #define BRI_SETTING_MIN                 30
@@ -1230,7 +1150,6 @@ static void __init msm_fb_add_devices(void)
 	printk(KERN_INFO "panel ID= 0x%x\n", panel_type);
 	msm_fb_register_device("mdp", &mdp_pdata);
 
-	msm_fb_register_device("lcdc", &lcdc_pdata);
 	if (panel_type != PANEL_ID_NONE)
 		msm_fb_register_device("mipi_dsi", &mipi_pdata);
 #ifdef CONFIG_MSM_BUS_SCALING
@@ -1275,7 +1194,6 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 #endif
 
 	ret = platform_device_register(&msm_fb_device);
-	ret = platform_device_register(&lcdc_samsung_panel_device);
 	ret = platform_device_register(&mipi_dsi_video_sharp_wvga_panel_device);
 	ret = platform_device_register(&mipi_dsi_cmd_sharp_qhd_panel_device);
 
