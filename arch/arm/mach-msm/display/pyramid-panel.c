@@ -407,15 +407,9 @@ static struct mipi_dsi_platform_data mipi_pdata = {
 	.dsi_power_save		= mipi_panel_power,
 };
 
-static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
-};
-
 static struct platform_device mipi_dsi_cmd_sharp_qhd_panel_device = {
 	.name = "mipi_novatek",
 	.id = 0,
-	.dev = {
-		.platform_data = &mipi_novatek_panel_data,
-	}
 };
 
 static int msm_fb_detect_panel(const char *name)
