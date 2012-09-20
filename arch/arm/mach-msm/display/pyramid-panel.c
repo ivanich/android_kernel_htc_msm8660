@@ -407,11 +407,6 @@ static struct mipi_dsi_platform_data mipi_pdata = {
 	.dsi_power_save		= mipi_panel_power,
 };
 
-static struct platform_device mipi_dsi_video_sharp_wvga_panel_device = {
-	.name = "dsi_video_sharp_wvga",
-	.id = 0,
-};
-
 static struct mipi_dsi_panel_platform_data mipi_novatek_panel_data = {
 };
 
@@ -1075,7 +1070,6 @@ int __init pyd_init_panel(struct resource *res, size_t size)
 	mdp_pdata.ov1_wb_size = MSM_FB_OVERLAY1_WRITEBACK_SIZE;
 
 	ret = platform_device_register(&msm_fb_device);
-	ret = platform_device_register(&mipi_dsi_video_sharp_wvga_panel_device);
 	ret = platform_device_register(&mipi_dsi_cmd_sharp_qhd_panel_device);
 
 	msm_fb_add_devices();
