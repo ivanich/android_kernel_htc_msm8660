@@ -402,9 +402,6 @@ struct msm_panel_common_pdata {
 	u32 mem_hid;
 	char cont_splash_enabled;
 	/* HTC additions */
-	unsigned char (*shrink_pwm)(int val);
-	int (*mdp_color_enhance)(void);
-	int (*mdp_gamma)(void);
 	struct gamma_curvy *abl_gamma_tbl;
 	struct mdp_reg *color_enhancment_tbl;
 };

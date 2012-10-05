@@ -867,6 +867,7 @@ static int mipi_novatek_lcd_on(struct platform_device *pdev)
 				ARRAY_SIZE(novatek_video_on_cmds));
 	} else {
 #ifdef CONFIG_MACH_PYRAMID
+		pr_info("%s: powering on pyramid panel\n", __func__);
 		mipi_dsi_cmds_tx(&novatek_tx_buf, mipi_power_on_cmds,
 				mipi_power_on_cmds_size);
 #else
