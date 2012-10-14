@@ -481,8 +481,6 @@ static void mdp_dma2_update_sub(struct msm_fb_data_type *mfd)
 void mdp_dma2_update(struct msm_fb_data_type *mfd)
 #endif
 {
-	if (!mfd)
-		return;
 	unsigned long flag;
 	static int first_vsync;
 	int need_wait = 0;
