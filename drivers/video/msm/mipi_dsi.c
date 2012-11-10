@@ -35,7 +35,7 @@
 #include "mdp.h"
 #include "mdp4.h"
 
-u32 dsi_irq;
+int dsi_irq;
 u32 esc_byte_ratio;
 
 static boolean tlmm_settings = FALSE;
