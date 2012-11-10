@@ -1961,6 +1961,7 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 		if (mdp_interrupt & LCDC_FRAME_START) {
 			dma = &dma2_data;
 			spin_lock_irqsave(&mdp_spin_lock, flag);
+			vsync_isr = vsync_cntrl.vsync_irq_enabled;
 			/* let's disable LCDC interrupt */
 			mdp_intr_mask &= ~LCDC_FRAME_START;
 			outp32(MDP_INTR_ENABLE, mdp_intr_mask);
