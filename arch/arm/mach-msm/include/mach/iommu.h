@@ -17,6 +17,8 @@
 #include <linux/clk.h>
 #include <mach/socinfo.h>
 
+extern pgprot_t     pgprot_kernel;
+
 /* Sharability attributes of MSM IOMMU mappings */
 #define MSM_IOMMU_ATTR_NON_SH		0x0
 #define MSM_IOMMU_ATTR_SH		0x4
