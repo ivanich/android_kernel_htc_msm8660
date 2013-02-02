@@ -885,16 +885,14 @@ static int mipi_novatek_lcd_on(struct platform_device *pdev)
                 mipi_dsi_cmds_tx(&novatek_tx_buf, mipi_power_on_cmds,
                                 mipi_power_on_cmds_size);
 #else
-                mipi_dsi_cmds_tx(&novatek_tx_buf, novatek_cmd_on_cmds,
-                                ARRAY_SIZE(novatek_cmd_on_cmds));
+		
+                cmdreq.cmds = novatek_cmd_on_cmds;
+                cmdreq.cmds_cnt = ARRAY_SIZE(novatek_cmd_on_cmds);
+                cmdreq.flags = CMD_REQ_COMMIT;
+                cmdreq.rlen = 0;
+                cmdreq.cb = NULL;
+                mipi_dsi_cmdlist_put(&cmdreq);
 #endif
-
-		cmdreq.cmds = novatek_cmd_on_cmds;
-		cmdreq.cmds_cnt = ARRAY_SIZE(novatek_cmd_on_cmds);
-		cmdreq.flags = CMD_REQ_COMMIT;
-		cmdreq.rlen = 0;
-		cmdreq.cb = NULL;
-		mipi_dsi_cmdlist_put(&cmdreq);
 
 		/* clean up ack_err_status */
 		mipi_dsi_cmd_bta_sw_trigger();
