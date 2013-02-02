@@ -520,7 +520,6 @@ enum mipi_dsi_3d_ctrl {
 	FPGA_SPI_INTF,
 };
 
-#if defined(CONFIG_FB_MSM8960) || (!defined(CONFIG_ARCH_MSM8X60) && !defined(CONFIG_ARCH_MSM7X27A))
 #ifndef CONFIG_ARCH_MSM7X27A
 /* DSI PHY configuration */
 struct mipi_dsi_phy_ctrl {
