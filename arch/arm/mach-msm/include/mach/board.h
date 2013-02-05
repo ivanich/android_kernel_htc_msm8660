@@ -468,18 +468,8 @@ struct msm_panel_common_pdata {
 	u32 mem_hid;
 	char cont_splash_enabled;
 	/* HTC additions */
-	void (*mdp_img_stick_wa)(bool);
-	unsigned long update_interval;
-	atomic_t img_stick_on;
-	struct panel_dcr_info *dcr_panel_pinfo;
-	unsigned int auto_bkl_stat;
-	int (*bkl_enable)(int);
-#ifdef CONFIG_FB_MSM8960
-	int (*acl_enable)(int);
-#else
-	int fpga_3d_config_addr;
 	struct gamma_curvy *abl_gamma_tbl;
-#endif
+	struct mdp_reg *color_enhancment_tbl;
 };
 
 struct lcdc_platform_data {
