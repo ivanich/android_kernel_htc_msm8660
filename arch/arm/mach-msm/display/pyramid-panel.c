@@ -40,6 +40,9 @@
 #include <linux/fb.h>
 #endif
 
+#include <linux/ion.h>
+#include <mach/ion.h>
+
 static struct regulator *l1_3v;
 static struct regulator *lvs1_1v8;
 static struct regulator *l4_1v8;
@@ -1016,11 +1019,11 @@ static struct msm_panel_common_pdata mdp_pdata = {
 	.mdp_bus_scale_table = &mdp_bus_scale_pdata,
 #endif
 	.mdp_rev = MDP_REV_41,
-//#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-//	.mem_hid = BIT(ION_CP_WB_HEAP_ID),
-//#else
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	.mem_hid = BIT(ION_CP_WB_HEAP_ID),
+#else
 	.mem_hid = MEMTYPE_EBI1,
-#//endif
+#endif
 	/* HTC additions */
 #if defined (CONFIG_FB_MSM_MDP_ABL)
 	.abl_gamma_tbl = &gamma_tbl,
