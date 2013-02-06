@@ -40,6 +40,9 @@
 #include <linux/fb.h>
 #endif
 
+#include <linux/ion.h>
+#include <mach/ion.h>
+
 static struct regulator *l1_3v;
 static struct regulator *lvs1_1v8;
 static struct regulator *l4_1v8;

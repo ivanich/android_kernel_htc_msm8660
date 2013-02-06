@@ -80,6 +80,7 @@ enum ion_heap_ids {
 	 */
 	ION_BOGUS_HEAP_DO_NOT_USE = 0,
 	ION_CP_MM_HEAP_ID = 8,
+	ION_CP_ROTATOR_HEAP_ID = 9,
 	ION_CP_MFC_HEAP_ID = 12,
 	ION_CP_WB_HEAP_ID = 16, /* 8660 only */
 	ION_CAMERA_HEAP_ID = 20, /* 8660 only */
@@ -117,6 +118,7 @@ enum ion_fixed_position {
 #define ION_MM_HEAP_NAME	"mm"
 #define ION_CAMERA_HEAP_NAME	"camera_preview"
 #define ION_IOMMU_HEAP_NAME	"iommu"
+#define ION_ROTATOR_HEAP_NAME   "rotator"
 #define ION_MFC_HEAP_NAME	"mfc"
 #define ION_WB_HEAP_NAME	"wb"
 #define ION_MM_FIRMWARE_HEAP_NAME	"mm_fw"

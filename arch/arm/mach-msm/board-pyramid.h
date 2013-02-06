@@ -43,6 +43,7 @@
 #else
 #define MSM_FB_EXT_BUFT_SIZE	0
 #endif
+#define MSM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
 
 #ifdef CONFIG_FB_MSM_OVERLAY0_WRITEBACK
 /* width x height x 3 bpp x 2 frame buffer */
@@ -70,6 +71,7 @@
 #define MSM_PMEM_ADSP2_SIZE	0x654000 /* 1152 * 1920 * 1.5 * 2 */
 #define MSM_PMEM_AUDIO_SIZE	0x239000
 #define MSM_PMEM_KERNEL_EBI1_SIZE	0xC7000
+#define MSM_PMEM_SF_BASE		(0x70000000 - MSM_PMEM_SF_SIZE)
 
 #define MSM_FB_WRITEBACK_BASE	(0x45C00000)
 #define MSM_PMEM_AUDIO_BASE	(0x46400000)
