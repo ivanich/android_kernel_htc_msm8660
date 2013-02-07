@@ -100,6 +100,7 @@
 #define WAIT_FENCE_TIMEOUT 200
 
 uint32_t rotator_hw_revision;
+static char rot_iommu_split_domain;
 
 /*
  * rotator_hw_revision:
@@ -177,6 +178,7 @@ int msm_rotator_iommu_map_buf(int mem_id, unsigned char src,
 	unsigned long *start, unsigned long *len,
 	struct ion_handle **pihdl)
 {
+	int domain;
 	if (!msm_rotator_dev->client)
 		return -EINVAL;
 
@@ -185,11 +187,16 @@ int msm_rotator_iommu_map_buf(int mem_id, unsigned char src,
 		pr_err("ion_import_fd() failed\n");
 		return PTR_ERR(*pihdl);
 	}
-	pr_debug("%s(): ion_hdl %p, ion_buf %p\n", __func__, *pihdl,
-		ion_share(msm_rotator_dev->client, *pihdl));
+
+	pr_debug("%s(): ion_hdl %p, ion_fd %d\n", __func__, *pihdl, mem_id);
+
+	if (rot_iommu_split_domain)
+		domain = src ? ROTATOR_SRC_DOMAIN : ROTATOR_DST_DOMAIN;
+	else
+		domain = ROTATOR_SRC_DOMAIN;
 
 	if (ion_map_iommu(msm_rotator_dev->client,
-		*pihdl,	ROTATOR_DOMAIN, GEN_POOL,
+		*pihdl,	domain, GEN_POOL,
 		SZ_4K, 0, start, len, 0, ION_IOMMU_UNMAP_DELAYED)) {
 		pr_err("ion_map_iommu() failed\n");
 		return -EINVAL;
@@ -281,12 +288,17 @@ static void enable_rot_clks(void)
 /* disable clocks needed by rotator block */
 static void disable_rot_clks(void)
 {
+	int ret = 0;
 	if (msm_rotator_dev->core_clk != NULL)
 		clk_disable_unprepare(msm_rotator_dev->core_clk);
 	if (msm_rotator_dev->pclk != NULL)
 		clk_disable_unprepare(msm_rotator_dev->pclk);
-	if (msm_rotator_dev->regulator)
-		regulator_disable(msm_rotator_dev->regulator);
+	if (msm_rotator_dev->regulator) {
+		ret = regulator_disable(msm_rotator_dev->regulator);
+		if (ret)
+			pr_err("%s : Failed msm_rotator_dev regulator disable.\n",
+				__func__);
+	}
 }
 
 static void msm_rotator_rot_clk_work_f(struct work_struct *work)
@@ -400,6 +412,8 @@ static int msm_rotator_get_plane_sizes(uint32_t format,	uint32_t w, uint32_t h,
 		break;
 	case MDP_Y_CRCB_H2V1:
 	case MDP_Y_CBCR_H2V1:
+	case MDP_Y_CRCB_H1V2:
+	case MDP_Y_CBCR_H1V2:
 		p->num_planes = 2;
 		p->plane_size[0] = w * h;
 		p->plane_size[1] = w * h;
@@ -448,8 +462,24 @@ static int msm_rotator_ycxcx_h2v1(struct msm_rotator_img_info *info,
 				  unsigned int out_chroma_paddr)
 {
 	int bpp;
-
-	if (info->src.format != info->dst.format)
+	uint32_t dst_format;
+	switch (info->src.format) {
+	case MDP_Y_CRCB_H2V1:
+		if (info->rotations & MDP_ROT_90)
+			dst_format = MDP_Y_CRCB_H1V2;
+		else
+			dst_format = info->src.format;
+		break;
+	case MDP_Y_CBCR_H2V1:
+		if (info->rotations & MDP_ROT_90)
+			dst_format = MDP_Y_CBCR_H1V2;
+		else
+			dst_format = info->src.format;
+		break;
+	default:
+		return -EINVAL;
+	}
+	if (info->dst.format != dst_format)
 		return -EINVAL;
 
 	bpp = get_bpp(info->src.format);
@@ -546,8 +576,8 @@ static int msm_rotator_ycxcx_h2v2(struct msm_rotator_img_info *info,
 
 	/* rotator expects YCbCr for planar input format */
 	if ((info->src.format == MDP_Y_CR_CB_H2V2 ||
-	    info->src.format == MDP_Y_CR_CB_GH2V2) &&
-	    rotator_hw_revision < ROTATOR_REVISION_V2)
+		info->src.format == MDP_Y_CR_CB_GH2V2) &&
+		rotator_hw_revision < ROTATOR_REVISION_V2)
 		swap(in_chroma_paddr, in_chroma2_paddr);
 
 	iowrite32(in_paddr, MSM_ROTATOR_SRCP0_ADDR);
@@ -630,9 +660,12 @@ static int msm_rotator_ycrycb(struct msm_rotator_img_info *info,
 	int bpp;
 	uint32_t dst_format;
 
-	if (info->src.format == MDP_YCRYCB_H2V1)
-		dst_format = MDP_Y_CRCB_H2V1;
-	else
+	if (info->src.format == MDP_YCRYCB_H2V1) {
+		if (info->rotations & MDP_ROT_90)
+			dst_format = MDP_Y_CRCB_H1V2;
+		else
+			dst_format = MDP_Y_CRCB_H2V1;
+	} else
 		return -EINVAL;
 
 	if (info->dst.format != dst_format)
@@ -859,17 +892,24 @@ static int get_img(struct msmfb_data *fbd, unsigned char src,
 
 }
 
-static void put_img(struct file *p_file, struct ion_handle *p_ihdl)
+static void put_img(struct file *p_file, struct ion_handle *p_ihdl,
+	unsigned char src)
 {
 #ifdef CONFIG_ANDROID_PMEM
 	if (p_file != NULL)
 		put_pmem_file(p_file);
 #endif
+
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	if (!IS_ERR_OR_NULL(p_ihdl)) {
+		int domain;
+		if (rot_iommu_split_domain)
+			domain = src ? ROTATOR_SRC_DOMAIN : ROTATOR_DST_DOMAIN;
+		else
+			domain = ROTATOR_SRC_DOMAIN;
 		pr_debug("%s(): p_ihdl %p\n", __func__, p_ihdl);
 		ion_unmap_iommu(msm_rotator_dev->client,
-			p_ihdl, ROTATOR_DOMAIN, GEN_POOL);
+			p_ihdl, domain, GEN_POOL);
 
 		ion_free(msm_rotator_dev->client, p_ihdl);
 	}
@@ -1212,15 +1252,15 @@ do_rotate_exit:
 #endif
 	schedule_delayed_work(&msm_rotator_dev->rot_clk_work, HZ);
 do_rotate_unlock_mutex:
-	put_img(dstp1_file, dstp1_ihdl);
-	put_img(srcp1_file, srcp1_ihdl);
-	put_img(dstp0_file, dstp0_ihdl);
+	put_img(dstp1_file, dstp1_ihdl, 0);
+	put_img(srcp1_file, srcp1_ihdl, 1);
+	put_img(dstp0_file, dstp0_ihdl, 0);
 
 	/* only source may use frame buffer */
 	if (info.src.flags & MDP_MEMORY_ID_TYPE_FB)
 		fput_light(srcp0_file, ps0_need);
 	else
-		put_img(srcp0_file, srcp0_ihdl);
+		put_img(srcp0_file, srcp0_ihdl, 1);
 	mutex_unlock(&msm_rotator_dev->rotator_lock);
 	dev_dbg(msm_rotator_dev->device, "%s() returning rc = %d\n",
 		__func__, rc);
@@ -1297,14 +1337,27 @@ static int msm_rotator_start(unsigned long arg,
 		is_rgb = 1;
 		info.dst.format = info.src.format;
 		break;
+	case MDP_Y_CBCR_H2V1:
+	if (info.rotations & MDP_ROT_90) {
+		info.dst.format = MDP_Y_CBCR_H1V2;
+		break;
+	}
+	case MDP_Y_CRCB_H2V1:
+	if (info.rotations & MDP_ROT_90) {
+		info.dst.format = MDP_Y_CRCB_H1V2;
+		break;
+	}
 	case MDP_Y_CBCR_H2V2:
 	case MDP_Y_CRCB_H2V2:
-	case MDP_Y_CBCR_H2V1:
-	case MDP_Y_CRCB_H2V1:
+	case MDP_YCBCR_H1V1:
+	case MDP_YCRCB_H1V1:
 		info.dst.format = info.src.format;
 		break;
 	case MDP_YCRYCB_H2V1:
-		info.dst.format = MDP_Y_CRCB_H2V1;
+		if (info.rotations & MDP_ROT_90)
+			info.dst.format = MDP_Y_CRCB_H1V2;
+		else
+			info.dst.format = MDP_Y_CRCB_H2V1;
 		break;
 	case MDP_Y_CB_CR_H2V2:
 	case MDP_Y_CBCR_H2V2_TILE:
@@ -1358,14 +1411,14 @@ static int msm_rotator_start(unsigned long arg,
 			msm_rotator_dev->img_info[first_free_index];
 		*(msm_rotator_dev->img_info[first_free_index]) = info;
 		msm_rotator_dev->fd_info[first_free_index] = fd_info;
+
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
+			rc = -EFAULT;
 	} else if (s == MAX_SESSIONS) {
 		dev_dbg(msm_rotator_dev->device, "%s: all sessions in use\n",
 			__func__);
 		rc = -EBUSY;
 	}
-
-	if (rc == 0 && copy_to_user((void __user *)arg, &info, sizeof(info)))
-		rc = -EFAULT;
 
 rotator_start_exit:
 	mutex_unlock(&msm_rotator_dev->rotator_lock);
@@ -1423,7 +1476,7 @@ msm_rotator_open(struct inode *inode, struct file *filp)
 	}
 
 	if (i == MAX_SESSIONS) {
-		mutex_unlock(&msm_rotator_dev->rotator_lock);
+	mutex_unlock(&msm_rotator_dev->rotator_lock);
 		return -EBUSY;
 	}
 
@@ -1466,7 +1519,6 @@ msm_rotator_close(struct inode *inode, struct file *filp)
 		mutex_unlock(&msm_rotator_dev->rotator_lock);
 		return 0;
 	}
-
 	for (s = 0; s < MAX_SESSIONS; s++) {
 		if (msm_rotator_dev->img_info[s] != NULL &&
 			msm_rotator_dev->fd_info[s] == fd_info) {
@@ -1540,6 +1592,7 @@ static int __devinit msm_rotator_probe(struct platform_device *pdev)
 
 	pdata = pdev->dev.platform_data;
 	number_of_clks = pdata->number_of_clocks;
+	rot_iommu_split_domain = pdata->rot_iommu_split_domain;
 
 	msm_rotator_dev->imem_owner = IMEM_NO_OWNER;
 	mutex_init(&msm_rotator_dev->imem_lock);

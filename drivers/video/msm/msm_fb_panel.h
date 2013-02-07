@@ -56,11 +56,6 @@ typedef enum {
 	MAX_PHYS_TARGET_NUM,
 } DISP_TARGET_PHYS;
 
-enum {
-	BLT_SWITCH_TG_OFF,
-	BLT_SWITCH_TG_ON
-};
-
 /* panel info type */
 struct lcd_panel_info {
 	__u32 vsync_enable;
@@ -146,6 +141,8 @@ struct mipi_panel_info {
 struct msm_panel_info {
 	__u32 xres;
 	__u32 yres;
+	__u32 height;
+	__u32 width;
 	__u32 bpp;
 	__u32 mode2_xres;
 	__u32 mode2_yres;
@@ -162,7 +159,7 @@ struct msm_panel_info {
 	__u32 frame_count;
 	__u32 is_3d_panel;
 	__u32 frame_rate;
-
+	__u32 frame_interval;
 
 	struct mddi_panel_info mddi;
 	struct lcd_panel_info lcd;

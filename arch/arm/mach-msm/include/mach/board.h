@@ -470,6 +470,7 @@ struct msm_panel_common_pdata {
 	/* HTC additions */
 	struct gamma_curvy *abl_gamma_tbl;
 	struct mdp_reg *color_enhancment_tbl;
+	char mdp_iommu_split_domain;
 };
 
 struct lcdc_platform_data {

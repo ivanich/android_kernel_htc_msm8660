@@ -34,6 +34,9 @@
 #include "mipi_dsi.h"
 #include "mdp.h"
 #include "mdp4.h"
+#if defined(CONFIG_MIPI_SAMSUNG_ESD_REFRESH)
+#include "mipi_samsung_esd_refresh.h"
+#endif
 
 u32 dsi_irq;
 u32 esc_byte_ratio;
@@ -68,6 +71,9 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	int ret = 0;
 	struct msm_fb_data_type *mfd;
 	struct msm_panel_info *pinfo;
+	uint32 dsi_ctrl;
+
+	pr_debug("Start of %s....:\n", __func__);
 
 	pr_debug("%s+:\n", __func__);
 
@@ -106,15 +112,14 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	ret = panel_next_off(pdev);
 
-#ifdef CONFIG_MSM_BUS_SCALING
-	mdp_bus_scale_update_request(0);
-#endif
-
 	spin_lock_bh(&dsi_clk_lock);
+
 	mipi_dsi_clk_disable();
 
 	/* disbale dsi engine */
-	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0);
+	dsi_ctrl = MIPI_INP(MIPI_DSI_BASE + 0x0000);
+	dsi_ctrl &= ~0x01;
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, dsi_ctrl);
 
 	mipi_dsi_phy_ctrl(0);
 
@@ -124,17 +129,21 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	mipi_dsi_unprepare_clocks();
 	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
 		mipi_dsi_pdata->dsi_power_save(0);
-
+#if defined(CONFIG_FB_MSM_MIPI_PANEL_POWERON_LP11)
+	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_client_power_save)
+		mipi_dsi_pdata->dsi_client_power_save(0);
+#endif /* CONFIG_FB_MSM_MIPI_PANEL_POWERON_LP11 */
 	if (mdp_rev >= MDP_REV_41)
 		mutex_unlock(&mfd->dma->ov_mutex);
 	else
 		up(&mfd->dma->mutex);
 
-	pr_debug("%s-:\n", __func__);
+	pr_debug("End of %s ....:\n", __func__);
 
 	return ret;
 }
 
+extern struct mdp4_overlay_perf perf_current;
 static int mipi_dsi_on(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -159,6 +168,13 @@ static int mipi_dsi_on(struct platform_device *pdev)
 
 	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
 		mipi_dsi_pdata->dsi_power_save(1);
+#if defined(CONFIG_FB_MSM_MIPI_PANEL_POWERON_LP11)
+	/*
+	 * Fix for floating state of VDD line in toshiba chip
+	 * */
+	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_client_power_save)
+		mipi_dsi_pdata->dsi_client_power_save(1);
+#endif /* CONFIG_FB_MSM_MIPI_PANEL_POWERON_LP11 */
 
 	cont_splash_clk_ctrl(0);
 	mipi_dsi_prepare_clocks();
@@ -246,6 +262,32 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	}
 
 	mipi_dsi_host_init(mipi);
+#if defined(CONFIG_FB_MSM_MIPI_PANEL_POWERON_LP11)
+	/*
+	 * For TC358764 D2L IC, one of the requirement for power on
+	 * is to maintain an LP11 state in data and clock lanes during
+	 * power enabling and reset assertion. This change is to
+	 * achieve that.
+	 * */
+	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_client_power_save) {
+		u32 tmp_reg0c, tmp_rega8;
+		mipi_dsi_pdata->dsi_client_reset();
+		udelay(200);
+		/* backup register values */
+		tmp_reg0c = MIPI_INP(MIPI_DSI_BASE + 0x000c);
+		tmp_rega8 = MIPI_INP(MIPI_DSI_BASE + 0xA8);
+		/* Clear HS  mode assertion and related flags */
+		MIPI_OUTP(MIPI_DSI_BASE + 0x0c, 0x8000);
+		MIPI_OUTP(MIPI_DSI_BASE + 0xA8, 0x0);
+		wmb();
+		mdelay(5);
+		/* restore previous values */
+		MIPI_OUTP(MIPI_DSI_BASE + 0x0c, tmp_reg0c);
+		MIPI_OUTP(MIPI_DSI_BASE + 0xa8, tmp_rega8);
+		wmb();
+	}
+#endif /* CONFIG_FB_MSM_MIPI_PANEL_POWERON_LP11 */
+
 
 	if (mipi->force_clk_lane_hs) {
 		u32 tmp;
@@ -316,20 +358,15 @@ static int mipi_dsi_on(struct platform_device *pdev)
 		mipi_dsi_unprepare_clocks();
 	}
 
-#ifdef CONFIG_MSM_BUS_SCALING
-	mdp_bus_scale_update_request(2);
-#endif
-
 	if (mdp_rev >= MDP_REV_41)
 		mutex_unlock(&mfd->dma->ov_mutex);
 	else
 		up(&mfd->dma->mutex);
 
-	pr_debug("%s-:\n", __func__);
+	pr_debug("End of %s....:\n", __func__);
 
 	return ret;
 }
-
 
 static int mipi_dsi_resource_initialized;
 
@@ -419,8 +456,11 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 			}
 		}
 
-		if (mipi_dsi_clk_init(pdev))
+		if (mipi_dsi_clk_init(pdev)){
+			free_irq(dsi_irq,0);
+			iounmap(periph_base);
 			return -EPERM;
+		}
 
 		if (mipi_dsi_pdata->splash_is_enabled &&
 			!mipi_dsi_pdata->splash_is_enabled()) {
@@ -448,9 +488,6 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 
 	if (pdev_list_cnt >= MSM_FB_MAX_DEV_LIST)
 		return -ENOMEM;
-
-	if (!mfd->cont_splash_done)
-		cont_splash_clk_ctrl(1);
 
 	mdp_dev = platform_device_alloc("mdp", pdev->id);
 	if (!mdp_dev)
@@ -584,6 +621,13 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		goto mipi_dsi_probe_err;
 
 	pdev_list[pdev_list_cnt++] = pdev;
+
+#if defined(CONFIG_MIPI_SAMSUNG_ESD_REFRESH)
+	register_mipi_dev(pdev);
+#endif
+
+	if (!mfd->cont_splash_done)
+		cont_splash_clk_ctrl(1);
 
 return 0;
 

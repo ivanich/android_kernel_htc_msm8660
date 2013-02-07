@@ -15,6 +15,8 @@
 #define MIPI_DSI_H
 
 #include <mach/scm-io.h>
+#include "msm_fb_def.h"
+#include "msm_fb.h"
 #include <linux/list.h>
 
 #ifdef BIT
@@ -126,6 +128,8 @@ enum dsi_trigger_type {
 #define DSI_CMD_TRIGGER_SW		0x04
 #define DSI_CMD_TRIGGER_SW_SEOF		0x05	/* cmd dma only */
 #define DSI_CMD_TRIGGER_SW_TE		0x06
+#define MIPI_DSI_TX_TIMEOUT_MS	(HZ * 40/1000)/*40ms*/
+#define MIPI_DSI_TX_REF_MS	17
 
 extern struct device dsi_dev;
 extern int mipi_dsi_clk_on;
@@ -265,7 +269,8 @@ struct dsi_kickoff_action {
 typedef void (*fxn)(u32 data);
 
 #define CMD_REQ_RX	0x0001
-#define CMD_REQ_COMMIT 0x0002
+#define CMD_REQ_COMMIT	0x0002
+#define CMD_CLK_CTRL	0x0004
 #define CMD_REQ_NO_MAX_PKT_SIZE 0x0008
 
 struct dcs_cmd_req {
@@ -282,7 +287,6 @@ struct dcs_cmd_list {
 	int tot;
 	struct dcs_cmd_req list[CMD_REQ_MAX];
 };
-
 
 char *mipi_dsi_buf_reserve_hdr(struct dsi_buf *dp, int hlen);
 char *mipi_dsi_buf_init(struct dsi_buf *dp);
