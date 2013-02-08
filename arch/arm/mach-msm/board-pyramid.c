@@ -128,6 +128,9 @@
 #include "acpuclock.h"
 #include <mach/board_htc.h>
 
+#include <linux/ion.h>
+#include <mach/ion.h>
+
 #ifdef CONFIG_PERFLOCK
 #include <mach/perflock.h>
 #endif
@@ -153,8 +156,7 @@ int set_two_phase_freq(int cpufreq);
 
 int __init pyd_init_panel(struct resource *res, size_t size);
 #ifdef CONFIG_ION_MSM
-int __init pyramid_ion_reserve_memory(struct memtype_reserve *table);
-int __init pyramid_ion_init();
+static struct platform_device ion_dev;
 #endif
 
 enum {
@@ -1879,6 +1881,121 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
+
+//#ifdef CONFIG_FB_MSM_LCDC_DSUB
+/* VGA = 1440 x 900 x 4(bpp) x 2(pages)
+   prim = 1024 x 600 x 4(bpp) x 2(pages)
+   This is the difference. */
+//#define MSM_FB_DSUB_PMEM_ADDER (0x9E3400-0x4B0000)
+//#else
+//#define MSM_FB_DSUB_PMEM_ADDER (0)
+//#endif
+
+#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
+/* prim = 960 x 540 x 4(bpp) x 3(pages) */
+#define MSM_FB_PRIM_BUF_SIZE (960 * ALIGN(540, 32) * 4 * 3)
+#else
+/* prim = 960 x 540 x 4(bpp) x 2(pages) */
+#define MSM_FB_PRIM_BUF_SIZE (960 * ALIGN(540, 32) * 4 * 2)
+#endif
+
+/* Note: must be multiple of 4096 */
+#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)
+
+
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+#define MSM_FB_EXT_BUF_SIZE  (1920 * 1080 * 2 * 1) /* 2 bpp x 1 page */
+#else
+#define MSM_FB_EXT_BUFT_SIZE   0
+#endif
+
+#define MSM_PMEM_SF_SIZE 0x4000000 /* 64 Mbytes */
+#define MSM_FB_WRITEBACK_SIZE   roundup(960 * ALIGN(540, 32) * 3 * 2, 4096)
+
+#define MSM_PMEM_ADSP_SIZE	0x23AC000
+//#define MSM_PMEM_ADSP2_SIZE	0x664000 /* ((1408 * 792 * 1.5) Align 2K) * 2 * 2 */
+#define MSM_PMEM_ADSP2_SIZE     0x654000 /* 1152 * 1920 * 1.5 * 2 */
+#define MSM_PMEM_AUDIO_SIZE	0x239000
+
+#define MSM_PMEM_SF_BASE		(0x70000000 - MSM_PMEM_SF_SIZE)
+//#define MSM_FB_WRITEBACK_BASE	(MSM_PMEM_SF_BASE - MSM_FB_WRITEBACK_SIZE) /* for pyramid MSM_OVERLAY_BLT_BASE=MSM_FB_WRITEBACK_BASE and MSM_OVERLAY_BLT_SIZE=MSM_FB_WRITEBACK_SIZE*/
+#define MSM_FB_WRITEBACK_BASE   (0x45C00000)
+//#define MSM_PMEM_AUDIO_BASE	    (MSM_OVERLAY_BLT_BASE - MSM_PMEM_AUDIO_SIZE)
+#define MSM_PMEM_AUDIO_BASE     (0x46400000)
+
+
+#define MSM_PMEM_ADSP_BASE	(0x40400000)
+#define MSM_PMEM_ADSP2_BASE	(MSM_PMEM_ADSP_BASE + MSM_PMEM_ADSP_SIZE)
+
+//#define MSM_FB_BASE             (0x6B000000)  /*MSM_PMEM_AUDIO_BASE is 0x6BACA000*/
+                                              /*to avoid alignment,  use 0x6BA00000 - 0xA00000*/
+
+#define MSM_FB_BASE             (0x70000000 - MSM_FB_SIZE)
+#define MSM_PMEM_KERNEL_EBI1_BASE	(MSM_PMEM_AUDIO_BASE + MSM_PMEM_AUDIO_SIZE)
+
+#define MSM_SMI_BASE          0x38000000
+#define MSM_SMI_SIZE          0x4000000
+
+/* Kernel SMI PMEM Region for video core, used for Firmware */
+/* and encoder,decoder scratch buffers */
+/* Kernel SMI PMEM Region Should always precede the user space */
+/* SMI PMEM Region, as the video core will use offset address */
+/* from the Firmware base */
+#define KERNEL_SMI_BASE       (MSM_SMI_BASE)
+#define KERNEL_SMI_SIZE       0x400000
+
+/* User space SMI PMEM Region for video core*/
+/* used for encoder, decoder input & output buffers  */
+#define USER_SMI_BASE         (KERNEL_SMI_BASE + KERNEL_SMI_SIZE)
+#define USER_SMI_SIZE         (MSM_SMI_SIZE - KERNEL_SMI_SIZE)
+#define MSM_PMEM_SMIPOOL_BASE USER_SMI_BASE
+#define MSM_PMEM_SMIPOOL_SIZE USER_SMI_SIZE
+
+#define PHY_BASE_ADDR1  0x48000000
+#define SIZE_ADDR1      0x25600000
+
+//#define MSM_PMEM_KERNEL_EBI1_SIZE  0x600000 /* (6MB) For QSECOM */
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#define MSM_ION_SF_SIZE       MSM_PMEM_SF_SIZE
+#define MSM_ION_ROTATOR_SIZE  MSM_PMEM_ADSP2_SIZE
+#define MSM_ION_MM_FW_SIZE    0x200000  /* KERNEL_SMI_SIZE */
+#define MSM_ION_MM_SIZE       0x3D00000 /* USER_SMI_SIZE */
+#define MSM_ION_MFC_SIZE      0x100000  /* KERNEL_SMI_SIZE */
+#define MSM_ION_WB_SIZE       0x2FD000  /* MSM_OVERLAY_BLT_SIZE=MSM_FB_WRITEBACK_SIZE */
+
+#ifdef CONFIG_MSM_CP
+#define MSM_ION_HOLE_SIZE	SZ_128K /* (128KB) */
+#else
+#define MSM_ION_HOLE_SIZE	0
+#endif
+
+#define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
+#define MSM_SMI_BASE          0x38000000
+#define MSM_MM_FW_BASE		MSM_SMI_BASE
+#define MSM_MM_FW_SIZE		(0x200000 - MSM_ION_HOLE_SIZE) /*(2MB-128KB)*/
+#define MSM_ION_CAMERA_SIZE     MSM_PMEM_ADSP_SIZE
+#define MSM_ION_QSECOM_SIZE	0x600000 /* (6MB) */
+
+#ifdef CONFIG_TZCOM
+//#define MSM_ION_QSECOM_SIZE   MSM_PMEM_KERNEL_EBI1_SIZE
+#define MSM_ION_HEAP_NUM      9
+#else
+#define MSM_ION_HEAP_NUM      8
+#endif
+
+#define MSM_ION_MM_BASE	      (MSM_ION_MM_FW_BASE + MSM_ION_MM_FW_SIZE)
+#define MSM_ION_MFC_BASE      (MSM_ION_MM_BASE + MSM_ION_MM_SIZE)
+
+#define MSM_ION_WB_BASE       (0x80000000 - MSM_ION_WB_SIZE)
+#define MSM_ION_ROTATOR_BASE  (MSM_ION_WB_BASE - MSM_ION_ROTATOR_SIZE)
+#define MSM_ION_CAMERA_BASE   (MSM_ION_ROTATOR_BASE - MSM_ION_CAMERA_SIZE)
+#define MSM_ION_QSECOM_BASE   (MSM_ION_CAMERA_BASE - MSM_ION_QSECOM_SIZE)
+#define MSM_ION_SF_BASE       (MSM_ION_QSECOM_BASE - MSM_ION_SF_SIZE)
+
+#else /* CONFIG_MSM_MULTIMEDIA_USE_ION */
+#define MSM_ION_HEAP_NUM      1
+#endif
+
 static unsigned fb_size;
 static int __init fb_size_setup(char *p)
 {
@@ -1889,6 +2006,7 @@ early_param("fb_size", fb_size_setup);
 
 #ifdef CONFIG_ANDROID_PMEM
 
+/*
 static unsigned pmem_mdp_size = MSM_PMEM_MDP_SIZE;
 static int __init pmem_mdp_size_setup(char *p)
 {
@@ -1914,7 +2032,7 @@ static int __init pmem_adsp2_size_setup(char *p)
 	return 0;
 }
 early_param("pmem_adsp2_size", pmem_adsp2_size_setup);
-
+*/
 static unsigned pmem_audio_size = MSM_PMEM_AUDIO_SIZE;
 
 static int __init pmem_audio_size_setup(char *p)
@@ -1981,6 +2099,7 @@ static struct android_pmem_platform_data android_pmem_audio_pdata = {
 	.name = "pmem_audio",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
 	.cached = 0,
+	.memory_type = MEMTYPE_EBI1,
 };
 
 static struct platform_device android_pmem_audio_device = {
@@ -2075,21 +2194,6 @@ static struct platform_device *hdmi_devices[] __initdata = {
 };
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
-static struct android_pmem_platform_data android_pmem_smipool_pdata = {
-	.name = "pmem_smipool",
-	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
-	.cached = 1,
-	.memory_type = MEMTYPE_SMI,
-	.request_region = pmem_request_smi_region,
-	.release_region = pmem_release_smi_region,
-	.setup_region = pmem_setup_smi_region,
-	.map_on_demand = 1,
-};
-static struct platform_device android_pmem_smipool_device = {
-	.name = "android_pmem",
-	.id = 7,
-	.dev = { .platform_data = &android_pmem_smipool_pdata },
-};
 #endif
 
 static void __init msm8x60_allocate_memory_regions(void)
@@ -3364,7 +3468,7 @@ static struct platform_device *pyramid_devices[] __initdata = {
 	&android_pmem_adsp2_device,
 #endif
 	&android_pmem_audio_device,
-	&android_pmem_smipool_device,
+//	&android_pmem_smipool_device,
 #endif
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
@@ -3427,6 +3531,11 @@ static struct platform_device *pyramid_devices[] __initdata = {
 	&msm_tsens_device,
 	&msm_rpm_device,
 	&cable_detect_device,
+
+#ifdef CONFIG_ION_MSM
+	&ion_dev,
+#endif
+
 #ifdef CONFIG_BT
 	&pyramid_rfkill,
 #endif
@@ -3435,6 +3544,13 @@ static struct platform_device *pyramid_devices[] __initdata = {
 };
 
 static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
+#if defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
+	[MEMTYPE_SMI] = {
+		.start	=	MSM_SMI_BASE,
+		.limit	=	MSM_SMI_SIZE,
+		.flags	=	MEMTYPE_FLAGS_FIXED,
+	},
+#else
 	/* Kernel SMI memory pool for video core, used for firmware */
 	/* and encoder, decoder scratch buffers */
 	/* Kernel SMI memory pool should always precede the user space */
@@ -3456,6 +3572,7 @@ static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
 	[MEMTYPE_EBI0] = {
 		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
 	},
+#endif
 	[MEMTYPE_EBI1] = {
 		.start	=	MSM_PMEM_KERNEL_EBI1_BASE,
 		.limit	=	MSM_PMEM_KERNEL_EBI1_SIZE,
@@ -3482,7 +3599,7 @@ static void __init size_pmem_devices(void)
 	size_pmem_device(&android_pmem_adsp_pdata, MSM_PMEM_ADSP_BASE, pmem_adsp_size);
 	size_pmem_device(&android_pmem_adsp2_pdata, MSM_PMEM_ADSP2_BASE, pmem_adsp2_size);
 #endif
-	size_pmem_device(&android_pmem_smipool_pdata, MSM_PMEM_SMIPOOL_BASE, MSM_PMEM_SMIPOOL_SIZE);
+//	size_pmem_device(&android_pmem_smipool_pdata, MSM_PMEM_SMIPOOL_BASE, MSM_PMEM_SMIPOOL_SIZE);
 	size_pmem_device(&android_pmem_audio_pdata, MSM_PMEM_AUDIO_BASE, MSM_PMEM_AUDIO_SIZE);
 #endif
 }
@@ -3508,19 +3625,30 @@ static void __init reserve_pmem_memory(void)
 	reserve_memory_for(&android_pmem_adsp_pdata);
 	reserve_memory_for(&android_pmem_adsp2_pdata);
 #endif
-	reserve_memory_for(&android_pmem_smipool_pdata);
+//	reserve_memory_for(&android_pmem_smipool_pdata);
 	reserve_memory_for(&android_pmem_audio_pdata);
+#endif
+}
+
+static void __init reserve_ion_memory(void)
+{
+#if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
+	msm8x60_reserve_table[MEMTYPE_EBI1].size += MSM_ION_SF_SIZE;
+	msm8x60_reserve_table[MEMTYPE_SMI].size += MSM_ION_MM_FW_SIZE;
+	msm8x60_reserve_table[MEMTYPE_SMI].size += MSM_ION_MM_SIZE;
+	msm8x60_reserve_table[MEMTYPE_SMI].size += MSM_ION_MFC_SIZE;
+	msm8x60_reserve_table[MEMTYPE_EBI1].size += MSM_ION_ROTATOR_SIZE;
+#ifdef CONFIG_TZCOM
+	msm8x60_reserve_table[MEMTYPE_EBI1].size += MSM_ION_QSECOM_SIZE;
+#endif
 #endif
 }
 
 static void __init msm8x60_calculate_reserve_sizes(void)
 {
-#ifdef CONFIG_ION_MSM
-	pyramid_ion_reserve_memory(msm8x60_reserve_table);
-#endif
-
 	size_pmem_devices();
 	reserve_pmem_memory();
+	reserve_ion_memory();
 }
 
 static int msm8x60_paddr_to_memtype(unsigned int paddr)
@@ -6040,6 +6168,149 @@ struct msm_bus_scale_pdata rotator_bus_scale_pdata = {
 };
 
 #endif
+/*
+ * =============== TV-out related function (BEGIN) ===============
+ */
+
+#ifdef CONFIG_ION_MSM
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+static int request_smi_region(void *data)
+{
+       pmem_request_smi_region(data);
+
+       return 0;
+}
+
+static int release_smi_region(void *data)
+{
+       pmem_release_smi_region(data);
+
+       return 0;
+}
+
+static struct ion_cp_heap_pdata cp_mm_ion_pdata = {
+       .permission_type = IPT_TYPE_MM_CARVEOUT,
+       .align = PAGE_SIZE,
+       .request_region = request_smi_region,
+       .release_region = release_smi_region,
+       .setup_region = pmem_setup_smi_region,
+};
+
+static struct ion_cp_heap_pdata cp_mfc_ion_pdata = {
+       .permission_type = IPT_TYPE_MFC_SHAREDMEM,
+       .align = PAGE_SIZE,
+       .request_region = request_smi_region,
+       .release_region = release_smi_region,
+       .setup_region = pmem_setup_smi_region,
+};
+
+static struct ion_cp_heap_pdata cp_wb_ion_pdata = {
+       .permission_type = IPT_TYPE_MDP_WRITEBACK,
+       .align = PAGE_SIZE,
+};
+
+static struct ion_co_heap_pdata fw_co_ion_pdata = {
+       .adjacent_mem_id = ION_CP_MM_HEAP_ID,
+       .align = SZ_128K,
+};
+
+static struct ion_co_heap_pdata co_ion_pdata = {
+       .adjacent_mem_id = INVALID_HEAP_ID,
+       .align = PAGE_SIZE,
+};
+
+#endif
+static struct ion_platform_data ion_pdata = {
+       .nr = MSM_ION_HEAP_NUM,
+       .heaps = {
+               {
+                       .id     = ION_SYSTEM_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_SYSTEM,
+                       .name   = ION_VMALLOC_HEAP_NAME,
+               },
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+               /* SMI part */
+               {
+                       .id     = ION_CP_MM_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CP,
+                       .name   = ION_MM_HEAP_NAME,
+                       .size   = MSM_ION_MM_SIZE,
+                       .memory_type = ION_SMI_TYPE,
+                       .extra_data = (void *) &cp_mm_ion_pdata,
+               },
+               {
+                       .id     = ION_MM_FIRMWARE_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CARVEOUT,
+                       .name   = ION_MM_FIRMWARE_HEAP_NAME,
+                       .size   = MSM_ION_MM_FW_SIZE,
+                       .memory_type = ION_SMI_TYPE,
+                       .extra_data = (void *) &fw_co_ion_pdata,
+               },
+               {
+                       .id     = ION_CP_MFC_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CP,
+                       .name   = ION_MFC_HEAP_NAME,
+                       .size   = MSM_ION_MFC_SIZE,
+                       .memory_type = ION_SMI_TYPE,
+                       .extra_data = (void *) &cp_mfc_ion_pdata,
+               },
+               /* EBI part: QSECOM needs to be the 1st one to avoid wasting memory when it's disabled. */
+#ifdef CONFIG_TZCOM
+               {
+                       .id     = ION_QSECOM_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CARVEOUT,
+                       .name   = ION_QSECOM_HEAP_NAME,
+                       .size   = MSM_ION_QSECOM_SIZE,
+                       .memory_type = ION_EBI_TYPE,
+                       .extra_data = (void *) &co_ion_pdata,
+               },
+#endif
+               {
+                       .id     = ION_CP_ROTATOR_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CARVEOUT,
+                       .name   = ION_ROTATOR_HEAP_NAME,
+                       .base   = MSM_ION_ROTATOR_BASE,
+                       .size   = MSM_ION_ROTATOR_SIZE,
+                       .memory_type = ION_EBI_TYPE,
+                       .extra_data = &co_ion_pdata,
+               },
+               {
+                       .id     = ION_CAMERA_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CARVEOUT,
+                       .name   = ION_CAMERA_HEAP_NAME,
+                       .base   = MSM_ION_CAMERA_BASE,
+                       .size   = MSM_ION_CAMERA_SIZE,
+                       .memory_type = ION_EBI_TYPE,
+                       .extra_data = &co_ion_pdata,
+               },
+                {
+                        .id     = ION_SF_HEAP_ID,
+                        .type   = ION_HEAP_TYPE_CARVEOUT,
+                        .name   = ION_SF_HEAP_NAME,
+                        .base   = MSM_ION_SF_BASE,
+                        .size   = MSM_ION_SF_SIZE,
+                        .memory_type = ION_EBI_TYPE,
+                        .extra_data = (void *) &co_ion_pdata,
+                },
+               {
+                       .id     = ION_CP_WB_HEAP_ID,
+                       .type   = ION_HEAP_TYPE_CP,
+                       .name   = ION_WB_HEAP_NAME,
+                       .base   = MSM_ION_WB_BASE,
+                       .size   = MSM_ION_WB_SIZE,
+                       .memory_type = ION_EBI_TYPE,
+                       .extra_data = (void *) &cp_wb_ion_pdata,
+               },
+#endif
+       }
+};
+
+static struct platform_device ion_dev = {
+       .name = "ion-msm",
+       .id = 1,
+       .dev = { .platform_data = &ion_pdata },
+};
+#endif
 
 #ifdef CONFIG_FB_MSM_TVOUT
 static struct regulator *reg_8058_l13;
@@ -6355,9 +6626,9 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 	platform_add_devices(pyramid_devices,
 			     ARRAY_SIZE(pyramid_devices));
 
-#ifdef CONFIG_ION_MSM
-	pyramid_ion_init();
-#endif
+//#ifdef CONFIG_ION_MSM
+//	pyramid_ion_init();
+//#endif
 
 	/*usb driver won't be loaded in MFG 58 station and gift mode*/
 	if (!(board_mfg_mode() == 6 || board_mfg_mode() == 7))
