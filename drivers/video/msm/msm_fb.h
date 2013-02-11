@@ -79,7 +79,7 @@ struct msm_fb_data_type {
 	DISP_TARGET dest;
 	struct fb_info *fbi;
 
-	struct device *dev;
+	struct delayed_work backlight_worker;
 	boolean op_enable;
 	uint32 fb_imgType;
 	boolean sw_currently_refreshing;
@@ -188,8 +188,6 @@ struct msm_fb_data_type {
 	u32 mdp_rev;
 	u32 writeback_state;
 	bool writeback_active_cnt;
-	boolean resume_state;
-	boolean backlight_ctrl_ongoing;
 	int cont_splash_done;
 	u32 acq_fen_cnt;
 	struct sync_fence *acq_fen[MDP_MAX_FENCE_FD];
@@ -238,17 +236,14 @@ int msm_fb_signal_timeline(struct msm_fb_data_type *mfd);
 #ifdef CONFIG_FB_BACKLIGHT
 void msm_fb_config_backlight(struct msm_fb_data_type *mfd);
 #endif
-extern int poweroff_charging;
 
 void fill_black_screen(bool on, uint8 pipe_num, uint8 mixer_num);
 int msm_fb_check_frame_rate(struct msm_fb_data_type *mfd,
 				struct fb_info *info);
 
-extern boolean mdp4_overlay_used(void);
 #ifdef CONFIG_FB_MSM_LOGO
 #define INIT_IMAGE_FILE "/initlogo.rle"
-extern int load_565rle_image(char *filename, bool bf_supported);
-extern int draw_rgb888_screen(void);
+int load_565rle_image(char *filename, bool bf_supported);
 #endif
 
 #endif /* MSM_FB_H */

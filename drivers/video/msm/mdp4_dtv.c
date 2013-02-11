@@ -149,7 +149,7 @@ static int dtv_on(struct platform_device *pdev)
 	if (ret) {
 		pr_info("%s: clk_set_rate(%d) failed\n", __func__,
 			mfd->fbi->var.pixclock);
-		if (mfd->fbi->var.pixclock == 27027000)
+		if (mfd->fbi->var.pixclock == 27030000)
 			mfd->fbi->var.pixclock = 27000000;
 		ret = clk_set_rate(tv_src_clk, mfd->fbi->var.pixclock);
 	}

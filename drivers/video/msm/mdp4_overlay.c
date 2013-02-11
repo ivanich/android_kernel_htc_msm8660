@@ -22,7 +22,6 @@
 #include <linux/hrtimer.h>
 #include <linux/clk.h>
 #include <mach/hardware.h>
-#include <mach/camera.h>
 #include <mach/iommu_domains.h>
 #include <mach/iommu.h>
 #include <linux/iommu.h>
@@ -396,9 +395,7 @@ void mdp4_overlay_dmae_cfg(struct msm_fb_data_type *mfd, int atv)
 		MDP_OUTP(MDP_BASE + 0xb3014, 0x1000080);
 		MDP_OUTP(MDP_BASE + 0xb4004, 0x67686970);
 	} else {
-#ifdef CONFIG_FB_MSM_EXT_INTERFACE_COMMON
 		mdp_vid_quant_set();
-#endif
 		MDP_OUTP(MDP_BASE + 0xb0070, 0xff0000);
 		MDP_OUTP(MDP_BASE + 0xb0074, 0xff0000);
 		MDP_OUTP(MDP_BASE + 0xb0078, 0xff0000);
@@ -498,15 +495,8 @@ void mdp4_overlay_dmap_cfg(struct msm_fb_data_type *mfd, int lcdc)
 		dma2_cfg_reg |= DMA_DSTC0G_8BITS |	/* 888 24BPP */
 		    DMA_DSTC1B_8BITS | DMA_DSTC2R_8BITS;
 	}
-#ifdef MDP_UNDERFLOW_RESET_CTRL_CMD
-	if (!in_interrupt())
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	else
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, TRUE);
-#else
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-#endif
 
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
 #ifndef CONFIG_FB_MSM_LCDC_CHIMEI_WXGA_PANEL
 	if (lcdc)
@@ -519,15 +509,7 @@ void mdp4_overlay_dmap_cfg(struct msm_fb_data_type *mfd, int lcdc)
 	dma2_cfg_reg = (dma2_cfg_reg & mask) | (curr & ~mask);
 	MDP_OUTP(MDP_BASE + 0x90000, dma2_cfg_reg);
 
-#ifdef MDP_UNDERFLOW_RESET_CTRL_CMD
-	if (!in_interrupt())
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-	else
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, TRUE);
-#else
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-#endif
-
 }
 
 /*
@@ -537,15 +519,8 @@ void mdp4_overlay_dmap_xy(struct mdp4_overlay_pipe *pipe)
 {
 	uint32 off, bpp;
 
-#ifdef MDP_UNDERFLOW_RESET_CTRL_CMD
 	if (!in_interrupt())
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-	else
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, TRUE);
-#else
-	if (!in_interrupt())
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-#endif
 
 	if (pipe->dma_blt_addr) {
 #ifdef BLT_RGB565
@@ -570,16 +545,8 @@ void mdp4_overlay_dmap_xy(struct mdp4_overlay_pipe *pipe)
 	/* dma_p dest */
 	MDP_OUTP(MDP_BASE + 0x90010, (pipe->dst_y << 16 | pipe->dst_x));
 
-#ifdef MDP_UNDERFLOW_RESET_CTRL_CMD
 	if (!in_interrupt())
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-	else
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, TRUE);
-#else
-	if (!in_interrupt())
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-#endif
-
 }
 
 #define MDP4_VG_PHASE_STEP_DEFAULT	0x20000000
@@ -1633,56 +1600,6 @@ int mdp4_mixer_info(int mixer_num, struct mdp_mixer_info *info)
 	return cnt;
 }
 
-/*
-* mdp4_mixer_reset:
-* called from mixer_reset -- IRQ context
-* within spin_lock(&mdp_reset_irq) protection
-*/
-#ifdef MDP_UNDERFLOW_RESET_CTRL_CMD
-void mdp4_mixer_reset(int mixer)
-{
-	uint32 data, data1, data2, mask;
-	int i, ndx, min, max, bit;
-	/* MDP_LAYERMIXER_IN_CFG, shard by both mixer 0 and 1  */
-	data = inpdw(MDP_BASE + 0x10100);
-	data1 = data;
-	data2 = data;
-
-	if (mixer == 0) {
-		min = 1;
-		max = 8;
-		bit = 0x03; /* mixer0, dmap */
-	} else {
-		min = 9;
-		max = 0xf;
-		bit = 0x0C; /* mixer1, dmae */
-	}
-	mask = 0x0f;
-	for (i = 0 ; i < 8 ; i++) {
-		ndx = data2 & mask;
-		ndx >>= (i * 4);
-		if (ndx >= min && ndx <= max)
-			data1 &= ~mask;  /* unstage pipe from mixer */
-		mask <<= 4;
-	}
-	pr_err("%s: => MIXER_RESET, data1=%x data=%x\n", __func__, data1, data);
-	/* unstage pipes of mixer to be reset */
-	outpdw(MDP_BASE + 0x10100, data1); /* MDP_LAYERMIXER_IN_CFG */
-	outpdw(MDP_BASE + 0x18000, 0);
-
-	mdp4_sw_reset(bit); /* reset mixer */   /* 0 => mixer0, dmap */
-
-	/* restore origianl stage */
-	outpdw(MDP_BASE + 0x10100, data); /* MDP_LAYERMIXER_IN_CFG */
-	outpdw(MDP_BASE + 0x18000, 0);
-
-	mdp4_vg_csc_setup(0);
-	mdp4_vg_csc_setup(1);
-	mdp4_dsi_cmd_dmap_reconfig();
-	mdp4_stat.mixer_reset++;
-}
-#endif
-
 void mdp4_solidfill_commit(int mixer)
 {
 	struct blend_cfg bcfg;
@@ -1773,6 +1690,7 @@ void mdp4_mixer_stage_commit(int mixer)
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	mdp_clk_ctrl(0);
 }
+
 
 void mdp4_mixer_stage_up(struct mdp4_overlay_pipe *pipe, int commit)
 {
@@ -1867,11 +1785,8 @@ void mdp4_overlay_borderfill_stage_up(struct mdp4_overlay_pipe *pipe)
 	else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
 		mdp4_lcdc_base_swap(0, pipe);
 	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
-#ifdef CONFIG_FB_MSM_DTV
 		mdp4_dtv_base_swap(0, pipe);
-#else
-		mdp4_dtv_base_swap(pipe);
-#endif
+
 	mdp4_overlay_reg_flush(bspipe, 1);
 	/* borderfill pipe as base layer */
 	mdp4_mixer_stage_up(pipe, 0);
@@ -1927,11 +1842,8 @@ void mdp4_overlay_borderfill_stage_down(struct mdp4_overlay_pipe *pipe)
 	else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
 		mdp4_lcdc_base_swap(0, bspipe);
 	else if (ctrl->panel_mode & MDP4_PANEL_DTV)
-#ifdef CONFIG_FB_MSM_DTV
 		mdp4_dtv_base_swap(0, bspipe);
-#else
-		mdp4_dtv_base_swap(bspipe);
-#endif
+
 	/* free borderfill pipe */
 	mdp4_overlay_reg_flush(pipe, 1);
 	mdp4_mixer_stage_down(pipe, 0); /* commit will happen for bspipe up */
@@ -2093,7 +2005,6 @@ void mdp4_mixer_blend_setup(int mixer)
 			!(s_pipe->op_mode & (MDP4_OP_SCALEX_PIXEL_RPT | MDP4_OP_SCALEY_PIXEL_RPT)))
 			alpha_drop = 1;
 
-
 		d_pipe = mdp4_background_layer(mixer, s_pipe);
 		d_alpha = d_pipe->alpha_enable;
 		s_alpha = s_pipe->alpha_enable;
@@ -2102,7 +2013,6 @@ void mdp4_mixer_blend_setup(int mixer)
 		 __func__, i-2, d_pipe->pipe_ndx, d_alpha, d_pipe->alpha,
 		s_pipe->pipe_ndx, s_alpha, s_pipe->alpha, s_pipe->is_fg,
 		alpha_drop);
-
 
 		/* base on fg's alpha */
 		blend->bg_alpha = 0x0ff - s_pipe->alpha;
@@ -2765,25 +2675,6 @@ static int mdp4_calc_pipe_mdp_clk(struct msm_fb_data_type *mfd,
 	rst >>= shift;
 
 	/*
-	 * There is one special case for the panels that have low
-	 * v_back_porch (<=4), mdp clk should be fast enough to buffer
-	 * 4 lines input during back porch time if scaling is
-	 * required(FIR).
-	 */
-	if ((mfd->panel_info.lcdc.v_back_porch <= 4) &&
-			(pipe->src_h != pipe->dst_h)&& 
-			(mfd->panel_info.lcdc.v_back_porch != 0)) {
-		u32 clk = 0;
-		clk = 4 * (pclk >> shift) / mfd->panel_info.lcdc.v_back_porch;
-		clk <<= shift;
-		pr_debug("%s: mdp clk rate %d based on low vbp %d\n",
-			__func__, (u32)clk, mfd->panel_info.lcdc.v_back_porch);
-		rst = (rst > clk) ? rst : clk;
-		pr_debug("%s: calculated rst clk = %d\n",
-			__func__, (u32)rst);
-	}
-
-	/*
 	 * If the calculated mdp clk is less than panel pixel clk,
 	 * most likely due to upscaling, mdp clk rate will be set to
 	 * greater than pclk. Now the driver uses 1.15 as the
@@ -3016,7 +2907,6 @@ void mdp4_overlay_mdp_perf_upd(struct msm_fb_data_type *mfd,
 {
 	struct mdp4_overlay_perf *perf_req = &perf_request;
 	struct mdp4_overlay_perf *perf_cur = &perf_current;
-
 
 	pr_debug("%s %d: req mdp clk %d, cur mdp clk %d flag %d\n",
 		 __func__, __LINE__,
@@ -3423,19 +3313,17 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 	return 0;
 }
 
-int mdp4_overlay_wait4vsync(struct fb_info *info, long long *vtime)
+int mdp4_overlay_wait4vsync(struct fb_info *info)
 {
 	if (!hdmi_prim_display && info->node == 0) {
 		if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO)
-			mdp4_dsi_video_wait4vsync(0, vtime);
+			mdp4_dsi_video_wait4vsync(0);
 		else if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
-			mdp4_dsi_cmd_wait4vsync(0, vtime);
+			mdp4_dsi_cmd_wait4vsync(0);
 		else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
-			mdp4_lcdc_wait4vsync(0, vtime);
-		else if (ctrl->panel_mode & MDP4_PANEL_MDDI)
-			mdp4_mddi_wait4vsync(0, vtime);
+			mdp4_lcdc_wait4vsync(0);
 	} else if (hdmi_prim_display || info->node == 1) {
-		mdp4_dtv_wait4vsync(0, vtime);
+		mdp4_dtv_wait4vsync(0);
 	}
 
 	return 0;
@@ -3970,30 +3858,6 @@ done:
 	mutex_unlock(&mfd->dma->ov_mutex);
 	return err;
 }
-#ifdef MDP_HANG_DEBUG
-void mdp4_dump_regs(void)
-{
-	int i, z, start, len;
-	int offsets[] = {0x0, 0x200, 0x10000, 0x18000,  0x20000,  0x30000,  0x40000,  0x50000, 0x88000, 0x90000, 0xB0000, 0xD0000, 0xE0000};
-	int length[]  = {24,     64,     101,     101,       32,       32,       32,       32,     101,      64,      64,      27,      64};
-
-	for (i = 0; i < sizeof(offsets) / sizeof(int); i++) {
-		start = offsets[i];
-		len   = length[i];
-		
-		printk("-------- Address %05x: -------\n", start);
-		for (z = 0; z < len; z++) {
-			if ((z & 3) == 0)
-				printk("%05x:", start + (z * 4));
-			printk(" %08x", inpdw(MDP_BASE + start + (z * 4)));
-			if ((z & 3) == 3)
-				printk("\n");
-		}
-		if ((z & 3) != 0)
-			printk("\n");
-	}
-}
-#endif
 
 int mdp4_update_base_blend(struct msm_fb_data_type *mfd,
 			struct mdp_blend_cfg *mdp_blend_cfg)

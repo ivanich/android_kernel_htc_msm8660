@@ -28,6 +28,7 @@
 #include "adreno.h"
 #include "kgsl_trace.h"
 
+#ifdef CONFIG_MSM_IOMMU
 static struct kgsl_iommu_unit *get_iommu_unit(struct device *dev)
 {
 	int i, j, k;
@@ -71,7 +72,6 @@ static struct kgsl_iommu_device *get_iommu_device(struct kgsl_iommu_unit *unit,
 	return NULL;
 }
 
-//#ifdef CONFIG_MSM_IOMMU
 static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	struct device *dev, unsigned long addr, int flags)
 {
@@ -100,7 +100,7 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 
 	return 0;
 }
-//#endif
+#endif
 
 /*
  * kgsl_iommu_disable_clk - Disable iommu clocks
@@ -326,11 +326,11 @@ void *kgsl_iommu_create_pagetable(void)
 		KGSL_CORE_ERR("Failed to create iommu domain\n");
 		kfree(iommu_pt);
 		return NULL;
-//#ifdef CONFIG_MSM_IOMMU
+#ifdef CONFIG_MSM_IOMMU
 	} else {
 		iommu_set_fault_handler(iommu_pt->domain,
 			kgsl_iommu_fault_handler);
-//#endif
+#endif
 	}
 
 	return iommu_pt;

@@ -31,10 +31,8 @@
 #include "msm_fb.h"
 #include "hdmi_msm.h"
 #include "mdp4.h"
-#include "hdmi_msm.h"
 
 #define DTV_BASE	0xD0000
-#define DMA_E_BASE	0xB0000
 
 static int dtv_enabled;
 
@@ -247,6 +245,31 @@ int mdp4_dtv_pipe_commit(int cndx, int wait)
 	return cnt;
 }
 
+static void mdp4_dtv_vsync_irq_ctrl(int cndx, int enable)
+{
+	struct vsycn_ctrl *vctrl;
+	static int vsync_irq_cnt;
+
+	vctrl = &vsync_ctrl_db[cndx];
+
+	mutex_lock(&vctrl->update_lock);
+	if (enable) {
+		if (vsync_irq_cnt == 0)
+			vsync_irq_enable(INTR_EXTERNAL_VSYNC,
+						MDP_EXTER_VSYNC_TERM);
+		vsync_irq_cnt++;
+	} else {
+		if (vsync_irq_cnt) {
+			vsync_irq_cnt--;
+			if (vsync_irq_cnt == 0)
+				vsync_irq_disable(INTR_EXTERNAL_VSYNC,
+						MDP_EXTER_VSYNC_TERM);
+		}
+	}
+	pr_debug("%s: enable=%d cnt=%d\n", __func__, enable, vsync_irq_cnt);
+	mutex_unlock(&vctrl->update_lock);
+}
+
 void mdp4_dtv_vsync_ctrl(struct fb_info *info, int enable)
 {
 	struct vsycn_ctrl *vctrl;
@@ -264,16 +287,13 @@ void mdp4_dtv_vsync_ctrl(struct fb_info *info, int enable)
 
 	vctrl->vsync_irq_enabled = enable;
 
-	if (enable)
-		vsync_irq_enable(INTR_EXTERNAL_VSYNC, MDP_EXTER_VSYNC_TERM);
-	else
-		vsync_irq_disable(INTR_EXTERNAL_VSYNC, MDP_EXTER_VSYNC_TERM);
+	mdp4_dtv_vsync_irq_ctrl(cndx, enable);
 
 	if (vctrl->vsync_irq_enabled &&  atomic_read(&vctrl->suspend) == 0)
 		atomic_set(&vctrl->vsync_resume, 1);
 }
 
-void mdp4_dtv_wait4vsync(int cndx, long long *vtime)
+void mdp4_dtv_wait4vsync(int cndx)
 {
 	struct vsycn_ctrl *vctrl;
 	struct mdp4_overlay_pipe *pipe;
@@ -290,6 +310,8 @@ void mdp4_dtv_wait4vsync(int cndx, long long *vtime)
 	if (atomic_read(&vctrl->suspend) > 0)
 		return;
 
+	mdp4_dtv_vsync_irq_ctrl(cndx, 1);
+
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
 
 	if (vctrl->wait_vsync_cnt == 0)
@@ -298,9 +320,8 @@ void mdp4_dtv_wait4vsync(int cndx, long long *vtime)
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
 	wait_for_completion(&vctrl->vsync_comp);
+	mdp4_dtv_vsync_irq_ctrl(cndx, 0);
 	mdp4_stat.wait4vsync1++;
-
-	*vtime = ktime_to_ns(vctrl->vsync_time);
 }
 
 static void mdp4_dtv_wait4dmae(int cndx)
@@ -525,15 +546,6 @@ static int mdp4_dtv_start(struct msm_fb_data_type *mfd)
 	MDP_OUTP(MDP_BASE + DTV_BASE + 0x30, active_v_start);
 	MDP_OUTP(MDP_BASE + DTV_BASE + 0x38, active_v_end);
 
-	/* All of hdmi resolution except of 640*480p
-	   should trasmmit as a limited RGB range following HDMI/MHL SPEC.*/
-	if (var->reserved[3] != 1) {
-		/*MHL CTS 3.2.3.4 Video Quantization Ranges*/
-		MDP_OUTP(MDP_BASE + DMA_E_BASE + 0x70, 0x00EB0010);
-		MDP_OUTP(MDP_BASE + DMA_E_BASE + 0x74, 0x00EB0010);
-		MDP_OUTP(MDP_BASE + DMA_E_BASE + 0x78, 0x00EB0010);
-	}
-
 	/* Test pattern 8 x 8 pixel */
 	/* MDP_OUTP(MDP_BASE + DTV_BASE + 0x4C, 0x80000808); */
 
@@ -575,13 +587,6 @@ int mdp4_dtv_on(struct platform_device *pdev)
 		return -EINVAL;
 
 	vctrl->dev = mfd->fbi->dev;
-#if defined(CONFIG_VIDEO_MHL_V1) || defined(CONFIG_VIDEO_MHL_V2) || \
-		defined(CONFIG_VIDEO_MHL_TAB_V2)
-	if (!hdmi_msm_state->hpd_on_offline) {
-		pr_info("hdmi_online is not\n");
-		return -ENODEV;
-	}
-#endif
 
 	mdp_footswitch_ctrl(TRUE);
 	/* Mdp clock enable */
@@ -617,13 +622,6 @@ int mdp4_dtv_off(struct platform_device *pdev)
 	struct vsycn_ctrl *vctrl;
 	struct mdp4_overlay_pipe *pipe;
 	struct vsync_update *vp;
-#if defined(CONFIG_VIDEO_MHL_V1) || defined(CONFIG_VIDEO_MHL_V2) || \
-		defined(CONFIG_VIDEO_MHL_TAB_V2)
-	if (hdmi_msm_state->hpd_on_offline) {
-		pr_info("hpd_offline is not\n");
-		return -ENODEV;
-	}
-#endif
 
 	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
 
@@ -632,10 +630,7 @@ int mdp4_dtv_off(struct platform_device *pdev)
 	atomic_set(&vctrl->suspend, 1);
 	atomic_set(&vctrl->vsync_resume, 0);
 
-	if (vctrl->vsync_irq_enabled) {
-		while (vctrl->wait_vsync_cnt)
-			msleep(20);     /* >= 17 ms */
-	}
+	mdp4_dtv_wait4vsync(cndx);
 
 	complete_all(&vctrl->vsync_comp);
 

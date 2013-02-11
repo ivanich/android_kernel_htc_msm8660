@@ -38,15 +38,9 @@
 
 #include "msm_fb_panel.h"
 
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_HD_PT)
-#define MDP_HANG_DEBUG
-#endif
 extern uint32 mdp_hw_revision;
 extern ulong mdp4_display_intf;
 extern spinlock_t mdp_spin_lock;
-#ifdef MDP_UNDERFLOW_RESET_CTRL_CMD
-extern spinlock_t mixer_reset_lock;
-#endif
 extern int mdp_rev;
 extern int mdp_iommu_split_domain;
 extern struct mdp_csc_cfg mdp_csc_convert[4];
@@ -55,13 +49,6 @@ extern struct workqueue_struct *mdp_hist_wq;
 
 extern uint32 mdp_intr_mask;
 
-extern int mdp_lut_i;
-extern int mdp_lut_push;
-extern int mdp_lut_push_i;
-extern struct mutex mdp_lut_push_sem;
-#ifdef MDP_HANG_DEBUG
-extern void mdp4_dump_regs(void);//JSJEONG
-#endif
 #define MDP4_REVISION_V1		0
 #define MDP4_REVISION_V2		1
 #define MDP4_REVISION_V2_1	2
